@@ -58,6 +58,8 @@ RelWithDebInfo
 *~
 .*.swp
 CMakeCache.txt
+bld/build/
+bld/artifacts/
 ./MySql.ncb
 ./MySql.sln
 ./MySql.suo

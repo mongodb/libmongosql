@@ -92,6 +92,7 @@ my_bool	net_flush(NET *net);
 #include <sql_common.h>
 #include <mysql/client_plugin.h>
 #include "../libmysql/mysql_trace.h"  /* MYSQL_TRACE() instrumentation */
+#include "./hostname_validation.h"
 
 #define STATE_DATA(M) \
   (NULL != (M) ? &(MYSQL_EXTENSION_PTR(M)->state_change) : NULL)
@@ -2768,7 +2769,7 @@ static int ssl_verify_server_cert(Vio *vio, const char* server_hostname, const c
   }
 
   DBUG_PRINT("info", ("Server hostname in cert: %s", cn));
-  if (!strcmp(cn, server_hostname))
+  if (Curl_cert_hostcheck(cn, server_hostname) == CURL_HOST_MATCH)
   {
     /* Success */
     ret_validation= 0;

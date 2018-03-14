@@ -256,6 +256,7 @@ SET(SQL_SOURCE
   ${SQL_SHARED_SOURCES}
   ../extra/lz4/xxhash.c
   ../libmysql/errmsg.c
+  ../sql-common/hostname_validation.c
   ../sql-common/client.c
   ../sql-common/client_plugin.c
   ../sql-common/my_time.c

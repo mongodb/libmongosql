@@ -72,6 +72,7 @@ SET(SQL_EMBEDDED_SOURCES
   ../client/get_password.c
   ../libmysql/errmsg.c
   ../libmysql/libmysql.c
+  ../sql-common/hostname_validation.c
   ../sql-common/client.c
   ../sql-common/client_plugin.c
   ../sql-common/my_time.c 
