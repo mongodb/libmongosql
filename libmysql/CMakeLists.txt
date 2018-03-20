@@ -1,4 +1,5 @@
 # Copyright (c) 2006, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) MongoDB, Inc. 2018-present.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -219,7 +220,11 @@ ADD_CONVENIENCE_LIBRARY(clientlib ${CLIENT_SOURCES})
 DTRACE_INSTRUMENT(clientlib)
 ADD_DEPENDENCIES(clientlib GenError)
 
-SET(LIBS clientlib dbug strings vio mysys mysys_ssl ${ZLIB_LIBRARY} ${SSL_LIBRARIES} ${LIBDL})
+SET(LIBS
+    clientlib dbug strings vio mysys mysys_ssl
+    ${ZLIB_LIBRARY} ${SSL_LIBRARIES} ${LIBDL}
+    mongosql_auth # libmysql depends on the mongosql_auth protocol implementation
+)
 
 #
 # On Windows platform client library includes the client-side 

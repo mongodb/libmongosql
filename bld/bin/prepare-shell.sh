@@ -1,3 +1,5 @@
+# Copyright (c) MongoDB, Inc. 2018-present.
+
 # This file should be sourced by all scripts in bld/bin
 
 # we start by sourcing platforms.sh. this will set environment variables that
@@ -7,34 +9,30 @@
 
 # create variables for a number of useful directories
 SCRIPT_DIR=$(dirname $(readlink -f $0))
+if [ "$OS" = "Windows_NT" ]; then
+    SCRIPT_DIR="$(cygpath -m "$SCRIPT_DIR")"
+fi
 PROJECT_ROOT="$SCRIPT_DIR/../.."
 BUILD_DIR="$PROJECT_ROOT/bld/build"
+BUILD_SRC_DIR="$PROJECT_ROOT/bld/src"
 ARTIFACTS_DIR="$PROJECT_ROOT/bld/artifacts"
 BOOST_DIR="$ARTIFACTS_DIR/boost"
 BISON_DIR="$ARTIFACTS_DIR/bison"
 MYSQL_HOME_DIR="$ARTIFACTS_DIR/mysql-home"
-
-# fix paths for cygwin
-if [ "$PLATFORM_NAME" = "windows" ]; then
-    SCRIPT_DIR="$(cygpath -w "$SCRIPT_DIR")"
-    PROJECT_ROOT="$(cygpath -w "$PROJECT_ROOT")"
-    ARTIFACTS_DIR="$(cygpath -w "$ARTIFACTS_DIR")"
-    BOOST_DIR="$(cygpath -w "$BOOST_DIR")"
-    BISON_DIR="$(cygpath -w "$BISON_DIR")"
-    MYSQL_HOME_DIR="$(cygpath -w "$MYSQL_HOME_DIR")"
-fi
-
-# set the CMake generator
-CMAKE_GENERATOR="Visual Studio 12 2013"
-if [ "$PLATFORM_ARCH" = "64" ]; then
-    CMAKE_GENERATOR="$CMAKE_GENERATOR Win64"
-fi
+MONGOSQL_AUTH_ROOT="$PROJECT_ROOT/bld/mongosql-auth-c"
 
 # make sure binaries we use in our scripts are available in the PATH
-DEVENV_PATH='/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 12.0/Common7/IDE'
-BISON_PATH='/cygdrive/c/bison/bin'
-CMAKE_PATH='/cygdrive/c/cmake/bin'
 PATH="$PATH:$DEVENV_PATH:$BISON_PATH:$CMAKE_PATH"
+
+# set the cmake arguments
+CMAKE_ARGS="-DWITH_BOOST=$BOOST_DIR -DDOWNLOAD_BOOST=1"
+
+# set the build command
+if [ "$OS" = 'Windows_NT' ]; then
+    BUILD='devenv.com MySQL.sln /Build Release /Project mysqlclient'
+else
+    BUILD='make mysqlclient'
+fi
 
 # export any environment variables that will be needed by subprocesses
 export PATH

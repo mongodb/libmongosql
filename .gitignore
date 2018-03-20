@@ -60,6 +60,7 @@ RelWithDebInfo
 CMakeCache.txt
 bld/build/
 bld/artifacts/
+bld/src/
 ./MySql.ncb
 ./MySql.sln
 ./MySql.suo

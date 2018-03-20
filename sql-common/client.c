@@ -1,4 +1,5 @@
 /* Copyright (c) 2003, 2017, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) MongoDB, Inc. 2018-present.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -92,6 +93,7 @@ my_bool	net_flush(NET *net);
 #include <sql_common.h>
 #include <mysql/client_plugin.h>
 #include "../libmysql/mysql_trace.h"  /* MYSQL_TRACE() instrumentation */
+#include "../plugin/auth/mongosql-auth/mongosql-auth-plugin.h"
 #include "./hostname_validation.h"
 
 #define STATE_DATA(M) \
@@ -3195,6 +3197,22 @@ static auth_plugin_t sha256_password_client_plugin=
 extern auth_plugin_t win_auth_client_plugin;
 #endif
 
+static auth_plugin_t mongosql_auth_client_plugin=
+{
+  MYSQL_CLIENT_AUTHENTICATION_PLUGIN,
+  MYSQL_CLIENT_AUTHENTICATION_PLUGIN_INTERFACE_VERSION,
+  "mongosql_auth",
+  "MongoDB Inc.",
+  "MongoDB MySQL Authentication Plugin",
+  {1,1,0},
+  "Apache License, Version 2.0",
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  mongosql_auth
+};
+
 /*
   Test trace plugin can be used only in debug builds. In non-debug ones
   it is ignored, even if it was enabled by build options (TEST_TRACE_PLUGIN macro).
@@ -3208,6 +3226,7 @@ extern auth_plugin_t test_trace_plugin;
 
 struct st_mysql_client_plugin *mysql_client_builtins[]=
 {
+  (struct st_mysql_client_plugin *)&mongosql_auth_client_plugin,
   (struct st_mysql_client_plugin *)&native_password_client_plugin,
   (struct st_mysql_client_plugin *)&clear_password_client_plugin,
 #if defined(HAVE_OPENSSL)
@@ -3983,7 +4002,7 @@ int run_plugin_auth(MYSQL *mysql, char *data, uint data_len,
   }
   else
   {
-    auth_plugin= &native_password_client_plugin;
+    auth_plugin= &mongosql_auth_client_plugin;
     auth_plugin_name= auth_plugin->name;
   }
 
