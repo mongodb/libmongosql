@@ -19,16 +19,16 @@ win32)
     PLATFORM_ARCH='32'
     PLATFORM_NAME='windows'
     CMAKE_PATH='/cygdrive/c/cmake/bin'
-    CMAKE_GENERATOR='Visual Studio 12 2013'
-    DEVENV_PATH='/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 12.0/Common7/IDE'
+    CMAKE_GENERATOR='Visual Studio 14 2015'
+    DEVENV_PATH='/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/Common7/IDE'
     BISON_PATH='/cygdrive/c/bison/bin'
     ;;
 win64)
     PLATFORM_ARCH='64'
     PLATFORM_NAME='windows'
-    CMAKE_GENERATOR='Visual Studio 12 2013 Win64'
+    CMAKE_GENERATOR='Visual Studio 14 2015 Win64'
     CMAKE_PATH='/cygdrive/c/cmake/bin'
-    DEVENV_PATH='/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 12.0/Common7/IDE'
+    DEVENV_PATH='/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/Common7/IDE'
     BISON_PATH='/cygdrive/c/bison/bin'
     ;;
 *)
