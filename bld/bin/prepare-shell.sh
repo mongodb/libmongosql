@@ -16,16 +16,21 @@ PROJECT_ROOT="$SCRIPT_DIR/../.."
 BUILD_DIR="$PROJECT_ROOT/bld/build"
 BUILD_SRC_DIR="$PROJECT_ROOT/bld/src"
 ARTIFACTS_DIR="$PROJECT_ROOT/bld/artifacts"
-BOOST_DIR="$ARTIFACTS_DIR/boost"
 BISON_DIR="$ARTIFACTS_DIR/bison"
 MYSQL_HOME_DIR="$ARTIFACTS_DIR/mysql-home"
 MONGOSQL_AUTH_ROOT="$PROJECT_ROOT/bld/mongosql-auth-c"
+
+BOOST_BASENAME='boost_1_59_0'
+BOOST_ARCHIVE_FILENAME="$BOOST_BASENAME.tar.gz"
+BOOST_ARCHIVE="$ARTIFACTS_DIR/$BOOST_ARCHIVE_FILENAME"
+BOOST_S3_URL="http://noexpire.s3.amazonaws.com/sqlproxy/sources/$BOOST_ARCHIVE_FILENAME"
+BOOST_DIR="$ARTIFACTS_DIR/$BOOST_BASENAME"
 
 # make sure binaries we use in our scripts are available in the PATH
 PATH="$PATH:$DEVENV_PATH:$BISON_PATH:$CMAKE_PATH"
 
 # set the cmake arguments
-CMAKE_ARGS="-DWITH_BOOST=$BOOST_DIR -DDOWNLOAD_BOOST=1"
+CMAKE_ARGS="-DWITH_BOOST=$BOOST_DIR"
 
 # set the build command
 if [ "$OS" = 'Windows_NT' ]; then

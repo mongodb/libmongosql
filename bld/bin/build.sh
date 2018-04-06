@@ -4,6 +4,16 @@
 # shellcheck source=prepare-shell.sh
 . "$(dirname "$0")/prepare-shell.sh"
 
+# if boost isn't already present, download it
+if [ ! -d "$BOOST_DIR" ]; then
+    rm -f "$BOOST_ARCHIVE"
+    curl -o "$BOOST_ARCHIVE" "$BOOST_S3_URL"
+    # need to supply --force-local because tar ascribes special meaning to colons in file names:
+    # https://unix.stackexchange.com/questions/13377/tar-extraction-depends-on-filename/13381#13381
+    tar xzf "$BOOST_ARCHIVE" -C "$ARTIFACTS_DIR" --force-local
+    rm "$BOOST_ARCHIVE"
+fi
+
 # clear the MYSQL_HOME_DIR
 rm -rf "$MYSQL_HOME_DIR"
 mkdir -p "$MYSQL_HOME_DIR/lib"
