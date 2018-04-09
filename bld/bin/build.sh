@@ -6,11 +6,16 @@
 
 # if boost isn't already present, download it
 if [ ! -d "$BOOST_DIR" ]; then
+    mkdir -p "$ARTIFACTS_DIR"
     rm -f "$BOOST_ARCHIVE"
     curl -o "$BOOST_ARCHIVE" "$BOOST_S3_URL"
     # need to supply --force-local because tar ascribes special meaning to colons in file names:
     # https://unix.stackexchange.com/questions/13377/tar-extraction-depends-on-filename/13381#13381
-    tar xzf "$BOOST_ARCHIVE" -C "$ARTIFACTS_DIR" --force-local
+    if [ "$OS" = "Windows_NT" ]; then
+        tar xzf "$BOOST_ARCHIVE" -C "$ARTIFACTS_DIR" --force-local
+    else
+        tar xzf "$BOOST_ARCHIVE" -C "$ARTIFACTS_DIR"
+    fi
     rm "$BOOST_ARCHIVE"
 fi
 
@@ -45,8 +50,9 @@ else
     cmake "$BUILD_SRC_DIR" $CMAKE_ARGS
 fi
 
-# build mysqlclient
+# build mysqlclient and the unit test binary
 eval $BUILD
+eval $BUILD_UNIT_TESTS
 
 # copy artifacts needed to build ODBC driver into MYSQL_HOME_DIR
 mysqlclient='libmysqlclient.a'

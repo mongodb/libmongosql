@@ -94,7 +94,7 @@ my_bool	net_flush(NET *net);
 #include <mysql/client_plugin.h>
 #include "../libmysql/mysql_trace.h"  /* MYSQL_TRACE() instrumentation */
 #include "../plugin/auth/mongosql-auth/mongosql-auth-plugin.h"
-#include "./hostname_validation.h"
+#include "hostcheck.h"
 
 #define STATE_DATA(M) \
   (NULL != (M) ? &(MYSQL_EXTENSION_PTR(M)->state_change) : NULL)

@@ -182,7 +182,9 @@ SET(CLIENT_SOURCES
   get_password.c 
   libmysql.c
   errmsg.c
-  ../sql-common/hostname_validation.c
+  ../sql-common/inet_pton.c
+  ../sql-common/strcase.c
+  ../sql-common/hostcheck.c
   ../sql-common/client.c 
   ../sql-common/my_time.c 
   ../sql-common/client_plugin.c 
