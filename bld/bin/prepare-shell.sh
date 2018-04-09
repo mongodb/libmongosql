@@ -8,11 +8,11 @@
 . "$(dirname "$0")/platforms.sh"
 
 # create variables for a number of useful directories
-SCRIPT_DIR=$(dirname $(readlink -f $0))
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd -P)
 if [ "$OS" = "Windows_NT" ]; then
     SCRIPT_DIR="$(cygpath -m "$SCRIPT_DIR")"
 fi
-PROJECT_ROOT="$SCRIPT_DIR/../.."
+PROJECT_ROOT="$SCRIPT_DIR"/../..
 BUILD_DIR="$PROJECT_ROOT/bld/build"
 BUILD_SRC_DIR="$PROJECT_ROOT/bld/src"
 ARTIFACTS_DIR="$PROJECT_ROOT/bld/artifacts"
@@ -38,7 +38,7 @@ if [ "$OS" = 'Windows_NT' ]; then
     BUILD_UNIT_TESTS='devenv.com MySQL.sln /Build Release /Project wildcard_hostname_validation_unit_tests'
     RUN_UNIT_TESTS="$BUILD_DIR/Release/wildcard_hostname_validation_unit_tests.exe"
 else
-    BUILD='make mysqlclient'
+    BUILD='make mysqlclient -j4'
     BUILD_UNIT_TESTS='make wildcard_hostname_validation_unit_tests'
     RUN_UNIT_TESTS="$BUILD_DIR/wildcard_hostname_validation_unit_tests"
 fi

@@ -13,6 +13,7 @@ case "$PLATFORM" in
 macos)
     PLATFORM_ARCH='64'
     PLATFORM_NAME='darwin'
+    CMAKE_GENERATOR="Unix Makefiles"
     CMAKE_PATH='/Applications/Cmake.app/Contents/bin'
     ;;
 win32)
