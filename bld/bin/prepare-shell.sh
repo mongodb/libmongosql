@@ -35,8 +35,12 @@ CMAKE_ARGS="-DWITH_BOOST=$BOOST_DIR"
 # set the build command
 if [ "$OS" = 'Windows_NT' ]; then
     BUILD='devenv.com MySQL.sln /Build Release /Project mysqlclient'
+    BUILD_UNIT_TESTS='devenv.com MySQL.sln /Build Release /Project wildcard_hostname_validation_unit_tests'
+    RUN_UNIT_TESTS="$BUILD_DIR/Release/wildcard_hostname_validation_unit_tests.exe"
 else
     BUILD='make mysqlclient'
+    BUILD_UNIT_TESTS='make wildcard_hostname_validation_unit_tests'
+    RUN_UNIT_TESTS="$BUILD_DIR/wildcard_hostname_validation_unit_tests"
 fi
 
 # export any environment variables that will be needed by subprocesses

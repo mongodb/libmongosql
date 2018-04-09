@@ -755,3 +755,10 @@ IF(NOT BUILD_IS_SINGLE_CONFIG)
   MESSAGE(STATUS
     "CMAKE_CXX_FLAGS_RELWITHDEBINFO: ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
 ENDIF()
+
+add_executable(wildcard_hostname_validation_unit_tests
+    ${CMAKE_SOURCE_DIR}/sql-common/hostname_validation_test.c
+    ${CMAKE_SOURCE_DIR}/sql-common/inet_pton.c
+    ${CMAKE_SOURCE_DIR}/sql-common/strcase.c
+    ${CMAKE_SOURCE_DIR}/sql-common/hostcheck.c
+)
