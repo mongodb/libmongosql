@@ -3205,7 +3205,7 @@ static auth_plugin_t mongosql_auth_client_plugin=
   "MongoDB Inc.",
   "MongoDB MySQL Authentication Plugin",
   {1,1,0},
-  "Apache License, Version 2.0",
+  "GNU General Public License v2.0",
   NULL,
   NULL,
   NULL,
