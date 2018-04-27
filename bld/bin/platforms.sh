@@ -14,6 +14,7 @@ macos)
     PLATFORM_ARCH='64'
     PLATFORM_NAME='darwin'
     CMAKE_GENERATOR="Unix Makefiles"
+    CMAKE_ARGS="-DOSX_UNIVERSAL=ON -DCMAKE_OSX_ARCHITECTURES='i386;x86_64'"
     CMAKE_PATH='/Applications/Cmake.app/Contents/bin'
     ;;
 win32)

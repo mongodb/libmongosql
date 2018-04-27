@@ -30,7 +30,9 @@ BOOST_DIR="$ARTIFACTS_DIR/$BOOST_BASENAME"
 PATH="$PATH:$DEVENV_PATH:$BISON_PATH:$CMAKE_PATH"
 
 # set the cmake arguments
-CMAKE_ARGS="-DWITH_BOOST=$BOOST_DIR"
+CMAKE_ARGS="$CMAKE_ARGS -DWITH_BOOST=$BOOST_DIR"
+
+echo $CMAKE_ARGS
 
 # set the build command
 if [ "$OS" = 'Windows_NT' ]; then

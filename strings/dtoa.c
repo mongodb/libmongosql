@@ -659,6 +659,10 @@ typedef struct Stack_alloc
   Bigint.
 */
 
+#ifndef SIZEOF_CHARP
+#define SIZEOF_CHARP 4
+#endif
+
 static Bigint *Balloc(int k, Stack_alloc *alloc)
 {
   Bigint *rv;
