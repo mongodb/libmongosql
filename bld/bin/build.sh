@@ -65,7 +65,7 @@ fi
 
 # build mysqlclient and the unit test binary.  the following eval statements
 # need to be unquoted because we want the shell to split on white space.
-# Shellcheck wants us to qute references, so we need to supress the warnings
+# Shellcheck wants us to quote references, so we need to supress the warnings
 # for SC2086.
 # shellcheck disable=SC2086
 eval $BUILD
@@ -77,7 +77,11 @@ mysqlclient='libmysqlclient.a'
 if [ "$OS" = 'Windows_NT' ]; then
     mysqlclient='Release/mysqlclient.lib'
 fi
-cp "$BUILD_DIR"/libmysql/"$mysqlclient" "$MYSQL_HOME_DIR"/lib/
+if [ -e "$BUILD_DIR"/libmysql/"$mysqlclient" ]; then
+    cp "$BUILD_DIR"/libmysql/"$mysqlclient" "$MYSQL_HOME_DIR"/lib/
+else
+    cp "$BUILD_DIR"/archive_output_directory/"$mysqlclient" "$MYSQL_HOME_DIR"/lib/
+fi
 cp -r "$PROJECT_ROOT"/include "$MYSQL_HOME_DIR"/
 cp -r "$BUILD_DIR"/include/* "$MYSQL_HOME_DIR"/include/
 cp "$PROJECT_ROOT"/libbinlogevents/export/binary_log_types.h "$MYSQL_HOME_DIR"/include/
