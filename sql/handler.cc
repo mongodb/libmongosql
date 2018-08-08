@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -332,6 +332,8 @@ st_handler_tablename mysqld_system_tables[]= {
   {mysqld_system_database, "help_keyword"},
   {mysqld_system_database, "help_relation"},
   {mysqld_system_database, "help_topic"},
+  {mysqld_system_database, "innodb_table_stats"},
+  {mysqld_system_database, "innodb_index_stats"},
   {(const char *)NULL, (const char *)NULL} /* This must be at the end */
 };
 
@@ -362,20 +364,20 @@ struct st_sys_tbl_chk_params
   bool is_sql_layer_system_table;             // IN param
   legacy_db_type db_type;                     // IN param
 
-  enum enum_sys_tbl_chk_status
+  enum enum_status
   {
-    // db.table_name is not a supported system table.
-    NOT_KNOWN_SYSTEM_TABLE,
+    // db.table_name is user table.
+    USER_TABLE,
     /*
       db.table_name is a system table,
       but may not be supported by SE.
     */
-    KNOWN_SYSTEM_TABLE,
+    SYSTEM_TABLE,
     /*
       db.table_name is a system table,
       and is supported by SE.
     */
-    SUPPORTED_SYSTEM_TABLE
+    SE_SUPPORTED_SYSTEM_TABLE
   } status;                                    // OUT param
 };
 
@@ -1767,13 +1769,14 @@ int ha_commit_trans(THD *thd, bool all, bool ignore_global_read_lock)
       release_mdl= true;
 
       DEBUG_SYNC(thd, "ha_commit_trans_after_acquire_commit_lock");
+    }
 
-      if (stmt_has_updated_trans_table(ha_info) && check_readonly(thd, true))
-      {
-        ha_rollback_trans(thd, all);
-        error= 1;
-        goto end;
-      }
+    if (rw_trans && stmt_has_updated_trans_table(ha_info)
+        && check_readonly(thd, true))
+    {
+      ha_rollback_trans(thd, all);
+      error= 1;
+      goto end;
     }
 
     if (!trn_ctx->no_2pc(trx_scope) && (trn_ctx->rw_ha_count(trx_scope) > 1))
@@ -2572,8 +2575,6 @@ int ha_delete_table(THD *thd, handlerton *table_type, const char *path,
   TABLE_SHARE dummy_share;
   DBUG_ENTER("ha_delete_table");
 
-  memset(&dummy_table, 0, sizeof(dummy_table));
-  memset(&dummy_share, 0, sizeof(dummy_share));
   dummy_table.s= &dummy_share;
 
   /* DB_TYPE_UNKNOWN is used in ALTER TABLE when renaming only .frm files */
@@ -4313,7 +4314,7 @@ int handler::check_old_types()
     if (table->s->mysql_version == 0) // prior to MySQL 5.0
     {
       /* check for bad DECIMAL field */
-      if ((*field)->type() == MYSQL_TYPE_NEWDECIMAL) // TODO: error? MYSQL_TYPE_DECIMAL?
+      if ((*field)->type() == MYSQL_TYPE_NEWDECIMAL)
       {
         return HA_ADMIN_NEEDS_ALTER;
       }
@@ -4322,6 +4323,19 @@ int handler::check_old_types()
         return HA_ADMIN_NEEDS_ALTER;
       }
     }
+
+    /*
+      Check for old DECIMAL field.
+
+      Above check does not take into account for pre 5.0 decimal types which can
+      be present in the data directory if user did in-place upgrade from
+      mysql-4.1 to mysql-5.0.
+    */
+    if ((*field)->type() == MYSQL_TYPE_DECIMAL)
+    {
+      return HA_ADMIN_NEEDS_DUMP_UPGRADE;
+    }
+
     if ((*field)->type() == MYSQL_TYPE_YEAR && (*field)->field_length == 2)
       return HA_ADMIN_NEEDS_ALTER; // obsolete YEAR(2) type
 
@@ -4581,7 +4595,9 @@ int handler::ha_repair(THD* thd, HA_CHECK_OPT* check_opt)
   DBUG_ASSERT(result == HA_ADMIN_NOT_IMPLEMENTED ||
               ha_table_flags() & HA_CAN_REPAIR);
 
-  if (result == HA_ADMIN_OK)
+  int old_types_error= check_old_types();
+
+  if (old_types_error != HA_ADMIN_NEEDS_DUMP_UPGRADE && result == HA_ADMIN_OK)
     result= update_frm_version(table);
   return result;
 }
@@ -4829,7 +4845,8 @@ handler::check_if_supported_inplace_alter(TABLE *altered_table,
     Alter_inplace_info::CHANGE_CREATE_OPTION |
     Alter_inplace_info::ALTER_RENAME |
     Alter_inplace_info::RENAME_INDEX |
-    Alter_inplace_info::ALTER_INDEX_COMMENT;
+    Alter_inplace_info::ALTER_INDEX_COMMENT |
+    Alter_inplace_info::ALTER_COLUMN_INDEX_LENGTH;
 
   /* Is there at least one operation that requires copy algorithm? */
   if (ha_alter_info->handler_flags & ~inplace_offline_operations)
@@ -5144,7 +5161,6 @@ int ha_create_table_from_engine(THD* thd, const char *db, const char *name)
   DBUG_ENTER("ha_create_table_from_engine");
   DBUG_PRINT("enter", ("name '%s'.'%s'", db, name));
 
-  memset(&create_info, 0, sizeof(create_info));
   if ((error= ha_discover(thd, db, name, &frmblob, &frmlen)))
   {
     /* Table could not be discovered and thus not created */
@@ -5220,8 +5236,107 @@ ha_check_if_table_exists(THD* thd, const char *db, const char *name,
   DBUG_RETURN(FALSE);
 }
 
+
 /**
-  @brief Check if a given table is a system table.
+  @brief Check if a given table is a user table or a valid system table or
+         a valid system table that a SE supports.
+
+  @param   hton                  Handlerton of new engine.
+  @param   db                    Database name.
+  @param   table_name            Table name to be checked.
+
+  @retval  st_sys_tbl_chk_params::enum_status
+*/
+static st_sys_tbl_chk_params::enum_status
+ha_get_system_table_check_status(handlerton *hton, const char *db,
+                                   const char *table_name)
+{
+  DBUG_ENTER("ha_get_system_table_check_status");
+  st_sys_tbl_chk_params check_params;
+  check_params.status= st_sys_tbl_chk_params::USER_TABLE;
+  bool is_system_database= false;
+  const char **names;
+  st_handler_tablename *systab;
+
+  // Check if we have a system database name in the command.
+  DBUG_ASSERT(known_system_databases != NULL);
+  names= known_system_databases;
+  while (names && *names)
+  {
+    if (strcmp(*names, db) == 0)
+    {
+      /* Used to compare later, will be faster */
+      check_params.db= *names;
+      is_system_database= true;
+      break;
+    }
+    names++;
+  }
+  if (!is_system_database)
+    DBUG_RETURN(st_sys_tbl_chk_params::USER_TABLE);
+
+  // Check if this is SQL layer system tables.
+  systab= mysqld_system_tables;
+  check_params.is_sql_layer_system_table= false;
+  while (systab && systab->db)
+  {
+    if (systab->db == check_params.db &&
+        strcmp(systab->tablename, table_name) == 0)
+    {
+      check_params.is_sql_layer_system_table= true;
+      break;
+    }
+    systab++;
+  }
+
+  // Check if this is a system table and if some engine supports it.
+  check_params.status= check_params.is_sql_layer_system_table ?
+    st_sys_tbl_chk_params::SYSTEM_TABLE :
+    st_sys_tbl_chk_params::USER_TABLE;
+  check_params.db_type= hton->db_type;
+  check_params.table_name= table_name;
+  plugin_foreach(NULL, check_engine_system_table_handlerton,
+                 MYSQL_STORAGE_ENGINE_PLUGIN, &check_params);
+
+  DBUG_RETURN(check_params.status);
+}
+
+
+/**
+  @brief Check if a given table is a system table supported by a SE.
+
+  @todo There is another function called is_system_table_name() used by
+        get_table_category(), which is used to set TABLE_SHARE table_category.
+        It checks only a subset of table name like proc, event and time*.
+        We cannot use below function in get_table_category(),
+        as that affects locking mechanism. If we need to
+        unify these functions, we need to fix locking issues generated.
+
+  @param   hton                  Handlerton of new engine.
+  @param   db                    Database name.
+  @param   table_name            Table name to be checked.
+
+  @return Operation status
+    @retval  true                If the table name is a valid system table
+                                 that is supported by a SE.
+
+    @retval  false               Not a system table.
+*/
+bool ha_is_supported_system_table(handlerton *hton, const char *db,
+                                  const char *table_name)
+{
+  DBUG_ENTER("ha_is_supported_system_table");
+  st_sys_tbl_chk_params::enum_status status=
+    ha_get_system_table_check_status(hton, db, table_name);
+
+  // It's a valid SE supported system table.
+  DBUG_RETURN(status == st_sys_tbl_chk_params::SE_SUPPORTED_SYSTEM_TABLE);
+}
+
+
+/**
+  @brief Check if a given table is a system table that belongs
+  to some SE or a user table.
 
   @details The primary purpose of introducing this function is to stop system
   tables to be created or being moved to undesired storage engines.
@@ -5245,62 +5360,19 @@ ha_check_if_table_exists(THD* thd, const char *db, const char *name,
                                  and does not belong to engine specified
                                  in the command.
 */
-bool ha_check_if_supported_system_table(handlerton *hton, const char *db,
-                                        const char *table_name)
+bool ha_is_valid_system_or_user_table(handlerton *hton, const char *db,
+                                      const char *table_name)
 {
-  DBUG_ENTER("ha_check_if_supported_system_table");
-  st_sys_tbl_chk_params check_params;
-  bool is_system_database= false;
-  const char **names;
-  st_handler_tablename *systab;
+  DBUG_ENTER("ha_is_valid_system_or_user_table");
 
-  // Check if we have a system database name in the command.
-  DBUG_ASSERT(known_system_databases != NULL);
-  names= known_system_databases;
-  while (names && *names)
-  {
-    if (strcmp(*names, db) == 0)
-    {
-      /* Used to compare later, will be faster */
-      check_params.db= *names;
-      is_system_database= true;
-      break;
-    }
-    names++;
-  }
-  if (!is_system_database)
-    DBUG_RETURN(true); // It's a user table name.
+  st_sys_tbl_chk_params::enum_status status=
+    ha_get_system_table_check_status(hton, db, table_name);
 
-  // Check if this is SQL layer system tables.
-  systab= mysqld_system_tables;
-  check_params.is_sql_layer_system_table= false;
-  while (systab && systab->db)
-  {
-    if (systab->db == check_params.db &&
-        strcmp(systab->tablename, table_name) == 0)
-    {
-      check_params.is_sql_layer_system_table= true;
-      break;
-    }
-    systab++;
-  }
-
-  // Check if this is a system table and if some engine supports it.
-  check_params.status= check_params.is_sql_layer_system_table ?
-    st_sys_tbl_chk_params::KNOWN_SYSTEM_TABLE :
-    st_sys_tbl_chk_params::NOT_KNOWN_SYSTEM_TABLE;
-  check_params.db_type= hton->db_type;
-  check_params.table_name= table_name;
-  plugin_foreach(NULL, check_engine_system_table_handlerton,
-                 MYSQL_STORAGE_ENGINE_PLUGIN, &check_params);
-
-  // SE does not support this system table.
-  if (check_params.status == st_sys_tbl_chk_params::KNOWN_SYSTEM_TABLE)
-    DBUG_RETURN(false);
-
-  // It's a system table or a valid user table.
-  DBUG_RETURN(true);
+  // It's a user table or a valid SE supported system table.
+  DBUG_RETURN(status == st_sys_tbl_chk_params::USER_TABLE ||
+              status == st_sys_tbl_chk_params::SE_SUPPORTED_SYSTEM_TABLE);
 }
+
 
 /**
   @brief Called for each SE to check if given db, tablename is a system table.
@@ -5331,7 +5403,7 @@ static my_bool check_engine_system_table_handlerton(THD *unused,
   handlerton *hton= plugin_data<handlerton*>(plugin);
 
   // Do we already know that the table is a system table?
-  if (check_params->status == st_sys_tbl_chk_params::KNOWN_SYSTEM_TABLE)
+  if (check_params->status == st_sys_tbl_chk_params::SYSTEM_TABLE)
   {
     /*
       If this is the same SE specified in the command, we can
@@ -5343,7 +5415,8 @@ static my_bool check_engine_system_table_handlerton(THD *unused,
           hton->is_supported_system_table(check_params->db,
                                        check_params->table_name,
                                        check_params->is_sql_layer_system_table))
-        check_params->status= st_sys_tbl_chk_params::SUPPORTED_SYSTEM_TABLE;
+        check_params->status=
+          st_sys_tbl_chk_params::SE_SUPPORTED_SYSTEM_TABLE;
       return TRUE;
     }
     /*
@@ -5369,11 +5442,11 @@ static my_bool check_engine_system_table_handlerton(THD *unused,
     */
     if (hton->db_type == check_params->db_type)
     {
-      check_params->status= st_sys_tbl_chk_params::SUPPORTED_SYSTEM_TABLE;
+      check_params->status= st_sys_tbl_chk_params::SE_SUPPORTED_SYSTEM_TABLE;
       return TRUE;
     }
     else
-      check_params->status= st_sys_tbl_chk_params::KNOWN_SYSTEM_TABLE;
+      check_params->status= st_sys_tbl_chk_params::SYSTEM_TABLE;
   }
 
   return FALSE;
@@ -7799,7 +7872,6 @@ int binlog_log_row(TABLE* table,
   {
     if (thd->variables.transaction_write_set_extraction != HASH_ALGORITHM_OFF)
     {
-      bitmap_set_all(table->read_set);
       if (before_record && after_record)
       {
         size_t length= table->s->reclength;
@@ -8657,6 +8729,59 @@ bool ha_notify_alter_table(THD *thd, const MDL_key *mdl_key,
                             MYSQL_STORAGE_ENGINE_PLUGIN, &rollback_params);
     }
     return true;
+  }
+  return false;
+}
+
+/**
+  Set the transaction isolation level for the next transaction and update
+  session tracker information about the transaction isolation level.
+
+  @param thd           THD session setting the tx_isolation.
+  @param tx_isolation  The isolation level to be set.
+  @param one_shot      True if the isolation level should be restored to
+                       session default after finishing the transaction.
+*/
+bool set_tx_isolation(THD *thd,
+                      enum_tx_isolation tx_isolation,
+                      bool one_shot)
+{
+  Transaction_state_tracker *tst= NULL;
+
+  if (thd->variables.session_track_transaction_info > TX_TRACK_NONE)
+    tst= (Transaction_state_tracker *)
+           thd->session_tracker.get_tracker(TRANSACTION_INFO_TRACKER);
+
+  thd->tx_isolation= tx_isolation;
+
+  if (one_shot)
+  {
+    DBUG_ASSERT(!thd->in_active_multi_stmt_transaction());
+    DBUG_ASSERT(!thd->in_sub_stmt);
+    enum enum_tx_isol_level l;
+    switch (thd->tx_isolation) {
+    case ISO_READ_UNCOMMITTED:
+      l=  TX_ISOL_UNCOMMITTED;
+      break;
+    case ISO_READ_COMMITTED:
+      l=  TX_ISOL_COMMITTED;
+      break;
+    case ISO_REPEATABLE_READ:
+      l= TX_ISOL_REPEATABLE;
+      break;
+    case ISO_SERIALIZABLE:
+      l= TX_ISOL_SERIALIZABLE;
+      break;
+    default:
+      DBUG_ASSERT(0);
+      return true;
+    }
+    if (tst)
+      tst->set_isol_level(thd, l);
+  }
+  else if (tst)
+  {
+    tst->set_isol_level(thd, TX_ISOL_INHERIT);
   }
   return false;
 }

@@ -335,6 +335,18 @@ row_create_update_node_for_mysql(
 /*=============================*/
 	dict_table_t*	table,	/*!< in: table to update */
 	mem_heap_t*	heap);	/*!< in: mem heap from which allocated */
+
+/**********************************************************************//**
+Does a cascaded delete or set null in a foreign key operation.
+@return error code or DB_SUCCESS */
+dberr_t
+row_update_cascade_for_mysql(
+/*=========================*/
+        que_thr_t*      thr,    /*!< in: query thread */
+        upd_node_t*     node,   /*!< in: update node used in the cascade
+                                or set null operation */
+        dict_table_t*   table)  /*!< in: table where we do the operation */
+        MY_ATTRIBUTE((nonnull, warn_unused_result));
 /*********************************************************************//**
 Locks the data dictionary exclusively for performing a table create or other
 data dictionary modification operation. */
@@ -547,6 +559,7 @@ row_rename_table_for_mysql(
 @return error code or DB_SUCCESS */
 dberr_t
 row_rename_partitions_for_mysql(
+	THD*		thd,
 	const char*	old_name,
 	const char*	new_name,
 	trx_t*		trx)
@@ -727,6 +740,8 @@ struct row_prebuilt_t {
 	mem_heap_t*	heap;		/*!< memory heap from which
 					these auxiliary structures are
 					allocated when needed */
+	mem_heap_t*     cursor_heap;	/*!< memory heap from which
+					innodb_api_buf is allocated per session */
 	ins_node_t*	ins_node;	/*!< Innobase SQL insert node
 					used to perform inserts
 					to the table */
@@ -876,6 +891,9 @@ struct row_prebuilt_t {
 	unsigned	innodb_api:1;	/*!< whether this is a InnoDB API
 					query */
 	const rec_t*	innodb_api_rec;	/*!< InnoDB API search result */
+	void*           innodb_api_buf; /*!< Buffer holding copy of the physical
+					Innodb API search record */
+	ulint           innodb_api_rec_size; /*!< Size of the Innodb API record */
 	/*----------------------*/
 
 	/*----------------------*/

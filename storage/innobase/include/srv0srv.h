@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2017, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 1995, 2018, Oracle and/or its affiliates. All rights reserved.
 Copyright (c) 2008, 2009, Google Inc.
 Copyright (c) 2009, Percona Inc.
 
@@ -246,7 +246,12 @@ any of the rollback-segment based on configuration used. */
 extern ulint	srv_undo_tablespaces_active;
 
 /** The number of undo segments to use */
+extern ulong	srv_rollback_segments;
+
+/* Used for the deprecated setting innodb_undo_logs. This will get put into
+srv_rollback_segments if it is set to non=default */
 extern ulong	srv_undo_logs;
+extern const char* deprecated_undo_logs;
 
 /** Maximum size of undo tablespace. */
 extern unsigned long long	srv_max_undo_log_size;
@@ -300,7 +305,7 @@ extern const ulint	srv_buf_pool_min_size;
 extern const ulint	srv_buf_pool_def_size;
 /** Requested buffer pool chunk size. Each buffer pool instance consists
 of one or more chunks. */
-extern ulong		srv_buf_pool_chunk_unit;
+extern ulonglong	srv_buf_pool_chunk_unit;
 /** Requested number of buffer pool instances */
 extern ulong		srv_buf_pool_instances;
 /** Default number of buffer pool instances */

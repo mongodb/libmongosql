@@ -1,4 +1,4 @@
-# Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -119,6 +119,7 @@ SET(GROUP_REPLICATION_SOURCES
   src/gcs_operations.cc
   src/gcs_plugin_messages.cc
   src/gcs_view_modification_notifier.cc
+  src/group_partition_handling.cc
   src/member_info.cc
   src/observer_server_actions.cc
   src/observer_server_channels.cc
@@ -134,6 +135,7 @@ SET(GROUP_REPLICATION_SOURCES
   src/recovery.cc
   src/recovery_channel_state_observer.cc
   src/applier_channel_state_observer.cc
+  src/asynchronous_channels_state_observer.cc
   src/recovery_message.cc
   src/recovery_state_transfer.cc
   src/replication_threads_api.cc
@@ -146,7 +148,6 @@ SET(GROUP_REPLICATION_SOURCES
   src/sql_service/sql_resultset.cc
   src/sql_service/sql_service_context.cc
   src/sql_service/sql_service_context_base.cc
-  src/sql_service/sql_service_gr_user.cc
   src/sql_service/sql_service_interface.cc
   src/sql_service/sql_command_test.cc
   src/sql_service/sql_service_command.cc
@@ -196,6 +197,12 @@ ELSEIF(WITH_GCS_LOG_DEBUG)
                                              "-DWITH_LOG_DEBUG")
 ENDIF()
 
+MY_CHECK_C_COMPILER_FLAG("-Wcast-function-type" HAVE_CAST_FUNCTION_TYPE)
+IF(HAVE_CAST_FUNCTION_TYPE)
+  ADD_COMPILE_FLAGS(libmysqlgcs/src/bindings/xcom/xcom/xcom_transport.c
+                    COMPILE_FLAGS "-Wno-cast-function-type")
+ENDIF()
+
 ### Configuration ###
 
 # disabling warnings for generated code
@@ -217,6 +224,7 @@ MYSQL_ADD_PLUGIN(group_replication
                  LINK_LIBRARIES
                  ${LZ4_LIBRARY}
                  ${SSL_LIBRARIES}
+                 ${TIRPC_LIBRARY}
                  MODULE_ONLY MODULE_OUTPUT_NAME "group_replication")
 
 ### INSTALLATION ###

@@ -1,4 +1,4 @@
-/* Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -188,27 +188,53 @@ bool all_tables_not_ok(THD *thd, TABLE_LIST *tables)
   @param thd  Thread handle.
   @param db   Database name used while evaluating the filtering
               rules.
-  
+  @param sql_cmd Represents the current query that needs to be
+                 verified against the database filter rules.
+  @return TRUE Query should not be filtered out from the execution.
+          FALSE Query should be filtered out from the execution.
+
 */
-inline bool db_stmt_db_ok(THD *thd, char* db)
+inline bool check_database_filters(THD *thd, const char* db, enum_sql_command sql_cmd)
 {
-  DBUG_ENTER("db_stmt_db_ok");
-
-  if (!thd->slave_thread)
+  DBUG_ENTER("check_database_filters");
+  DBUG_ASSERT(thd->slave_thread);
+  if (!db)
     DBUG_RETURN(TRUE);
-
+  switch (sql_cmd)
+  {
+  case SQLCOM_BEGIN:
+  case SQLCOM_COMMIT:
+  case SQLCOM_SAVEPOINT:
+  case SQLCOM_ROLLBACK:
+  case SQLCOM_ROLLBACK_TO_SAVEPOINT:
+    DBUG_RETURN(TRUE);
+  default:
+    break;
+  }
+  bool db_ok= rpl_filter->db_ok(db);
   /*
     No filters exist in ignore/do_db ? Then, just check
-    wild_do_table filtering. Otherwise, check the do_db
-    rules.
+    wild_do_table filtering for 'DATABASE' related
+    statements (CREATE/DROP/ATLER DATABASE)
   */
-  bool db_ok= (rpl_filter->get_do_db()->is_empty() &&
-               rpl_filter->get_ignore_db()->is_empty()) ?
-              rpl_filter->db_ok_with_wild_table(db) :
-              rpl_filter->db_ok(db);
-
+  if (db_ok &&
+      (rpl_filter->get_do_db()->is_empty() &&
+       rpl_filter->get_ignore_db()->is_empty()))
+  {
+    switch (sql_cmd)
+    {
+    case SQLCOM_CREATE_DB:
+    case SQLCOM_ALTER_DB:
+    case SQLCOM_ALTER_DB_UPGRADE:
+    case SQLCOM_DROP_DB:
+      db_ok= rpl_filter->db_ok_with_wild_table(db);
+    default:
+      break;
+    }
+  }
   DBUG_RETURN(db_ok);
 }
+
 #endif
 
 
@@ -1250,7 +1276,7 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
 
         TODO: remove this when we have full 64 bit my_time_t support
       */
-      sql_print_error("This MySQL server doesn't support dates later then 2038");
+      sql_print_error("This MySQL server doesn't support dates later than 2038");
       ulong master_access= thd->security_context()->master_access();
       thd->security_context()->set_master_access(master_access | SHUTDOWN_ACL);
       command= COM_SHUTDOWN;
@@ -1451,9 +1477,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
     thd->profiling.set_query_source(thd->query().str, thd->query().length);
 #endif
 
-    MYSQL_SET_STATEMENT_TEXT(thd->m_statement_psi, thd->query().str,
-                             thd->query().length);
-
     Parser_state parser_state;
     if (parser_state.init(thd, thd->query().str, thd->query().length))
       break;
@@ -1530,7 +1553,6 @@ bool dispatch_command(THD *thd, const COM_DATA *com_data,
                                           thd->db().str, thd->db().length,
                                           thd->charset(), NULL);
       THD_STAGE_INFO(thd, stage_starting);
-      MYSQL_SET_STATEMENT_TEXT(thd->m_statement_psi, beginning_of_next_stmt, length);
 
       thd->set_query(beginning_of_next_stmt, length);
       thd->set_query_id(next_query_id());
@@ -1904,6 +1926,7 @@ done:
   thd->reset_query();
   thd->set_command(COM_SLEEP);
   thd->proc_info= 0;
+  thd->lex->sql_command= SQLCOM_END;
 
   /* Performance Schema Interface instrumentation, end */
   MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
@@ -2483,13 +2506,9 @@ mysql_execute_command(THD *thd, bool first_level)
 #ifdef HAVE_REPLICATION
   if (unlikely(thd->slave_thread))
   {
-    // Database filters.
-    if (lex->sql_command != SQLCOM_BEGIN &&
-        lex->sql_command != SQLCOM_COMMIT &&
-        lex->sql_command != SQLCOM_SAVEPOINT &&
-        lex->sql_command != SQLCOM_ROLLBACK &&
-        lex->sql_command != SQLCOM_ROLLBACK_TO_SAVEPOINT &&
-        !rpl_filter->db_ok(thd->db().str))
+    if (!check_database_filters(thd,
+                                thd->db().str,
+                                lex->sql_command))
     {
       binlog_gtid_end_transaction(thd);
       DBUG_RETURN(0);
@@ -3297,7 +3316,6 @@ end_with_restore_list:
     */
     thd->enable_slow_log= opt_log_slow_admin_statements;
 
-    memset(&create_info, 0, sizeof(create_info));
     create_info.db_type= 0;
     create_info.row_type= ROW_TYPE_NOT_USED;
     create_info.default_table_charset= thd->variables.collation_database;
@@ -3560,44 +3578,6 @@ end_with_restore_list:
     break;
   }
   case SQLCOM_REPLACE:
-#ifndef DBUG_OFF
-    if (mysql_bin_log.is_open())
-    {
-      /*
-        Generate an incident log event before writing the real event
-        to the binary log.  We put this event is before the statement
-        since that makes it simpler to check that the statement was
-        not executed on the slave (since incidents usually stop the
-        slave).
-
-        Observe that any row events that are generated will be
-        generated before.
-
-        This is only for testing purposes and will not be present in a
-        release build.
-      */
-
-      binary_log::Incident_event::enum_incident incident=
-                                     binary_log::Incident_event::INCIDENT_NONE;
-      DBUG_PRINT("debug", ("Just before generate_incident()"));
-      DBUG_EXECUTE_IF("incident_database_resync_on_replace",
-                      incident= binary_log::Incident_event::INCIDENT_LOST_EVENTS;);
-      if (incident)
-      {
-        Incident_log_event ev(thd, incident);
-        const char* err_msg= "Generate an incident log event before "
-                             "writing the real event to the binary "
-                             "log for testing purposes.";
-        if (mysql_bin_log.write_incident(&ev, true/*need_lock_log=true*/,
-                                         err_msg))
-        {
-          res= 1;
-          break;
-        }
-      }
-      DBUG_PRINT("debug", ("Just after generate_incident()"));
-    }
-#endif
   case SQLCOM_INSERT:
   case SQLCOM_REPLACE_SELECT:
   case SQLCOM_INSERT_SELECT:
@@ -3816,20 +3796,6 @@ end_with_restore_list:
     if (!(alias=thd->strmake(lex->name.str, lex->name.length)) ||
         (check_and_convert_db_name(&lex->name, FALSE) != IDENT_NAME_OK))
       break;
-    /*
-      If in a slave thread :
-      CREATE DATABASE DB was certainly not preceded by USE DB.
-      For that reason, db_ok() in sql/slave.cc did not check the
-      do_db/ignore_db. And as this query involves no tables, tables_ok()
-      above was not called. So we have to check rules again here.
-    */
-#ifdef HAVE_REPLICATION
-    if (!db_stmt_db_ok(thd, lex->name.str))
-    {
-      my_message(ER_SLAVE_IGNORED_TABLE, ER(ER_SLAVE_IGNORED_TABLE), MYF(0));
-      break;
-    }
-#endif
     if (check_access(thd, CREATE_ACL, lex->name.str, NULL, NULL, 1, 0))
       break;
     res= mysql_create_db(thd,(lower_case_table_names == 2 ? alias :
@@ -3840,20 +3806,6 @@ end_with_restore_list:
   {
     if (check_and_convert_db_name(&lex->name, FALSE) != IDENT_NAME_OK)
       break;
-    /*
-      If in a slave thread :
-      DROP DATABASE DB may not be preceded by USE DB.
-      For that reason, maybe db_ok() in sql/slave.cc did not check the 
-      do_db/ignore_db. And as this query involves no tables, tables_ok()
-      above was not called. So we have to check rules again here.
-    */
-#ifdef HAVE_REPLICATION
-    if (!db_stmt_db_ok(thd, lex->name.str))
-    {
-      my_message(ER_SLAVE_IGNORED_TABLE, ER(ER_SLAVE_IGNORED_TABLE), MYF(0));
-      break;
-    }
-#endif
     if (check_access(thd, DROP_ACL, lex->name.str, NULL, NULL, 1, 0))
       break;
     res= mysql_rm_db(thd, to_lex_cstring(lex->name), lex->drop_if_exists, 0);
@@ -3862,14 +3814,6 @@ end_with_restore_list:
   case SQLCOM_ALTER_DB_UPGRADE:
   {
     LEX_STRING *db= & lex->name;
-#ifdef HAVE_REPLICATION
-    if (!db_stmt_db_ok(thd, lex->name.str))
-    {
-      res= 1;
-      my_message(ER_SLAVE_IGNORED_TABLE, ER(ER_SLAVE_IGNORED_TABLE), MYF(0));
-      break;
-    }
-#endif
     if (check_and_convert_db_name(db, FALSE) != IDENT_NAME_OK)
       break;
     if (check_access(thd, ALTER_ACL, db->str, NULL, NULL, 1, 0) ||
@@ -3891,20 +3835,6 @@ end_with_restore_list:
     HA_CREATE_INFO create_info(lex->create_info);
     if (check_and_convert_db_name(db, FALSE) != IDENT_NAME_OK)
       break;
-    /*
-      If in a slave thread :
-      ALTER DATABASE DB may not be preceded by USE DB.
-      For that reason, maybe db_ok() in sql/slave.cc did not check the
-      do_db/ignore_db. And as this query involves no tables, tables_ok()
-      above was not called. So we have to check rules again here.
-    */
-#ifdef HAVE_REPLICATION
-    if (!db_stmt_db_ok(thd, lex->name.str))
-    {
-      my_message(ER_SLAVE_IGNORED_TABLE, ER(ER_SLAVE_IGNORED_TABLE), MYF(0));
-      break;
-    }
-#endif
     if (check_access(thd, ALTER_ACL, db->str, NULL, NULL, 1, 0))
       break;
     res= mysql_alter_db(thd, db->str, &create_info);
@@ -4174,6 +4104,7 @@ end_with_restore_list:
       initialize this variable because RESET shares the same code as FLUSH
     */
     lex->no_write_to_binlog= 1;
+    // Fall through.
   case SQLCOM_FLUSH:
   {
     int write_to_binlog;
@@ -4277,11 +4208,12 @@ end_with_restore_list:
   case SQLCOM_SHOW_CREATE_USER:
   {
     LEX_USER *show_user= get_current_user(thd, lex->grant_user);
-    if (!(strcmp(thd->security_context()->priv_user().str, show_user->user.str) ||
-         my_strcasecmp(system_charset_info, show_user->host.str,
-                              thd->security_context()->priv_host().str)) ||
-        !check_access(thd, SELECT_ACL, "mysql", NULL, NULL, 1, 0))
-      res= mysql_show_create_user(thd, show_user);
+    Security_context *sctx= thd->security_context();
+    bool are_both_users_same= !strcmp(sctx->priv_user().str, show_user->user.str) &&
+                              !my_strcasecmp(system_charset_info, show_user->host.str,
+                                             sctx->priv_host().str);
+    if (are_both_users_same || !check_access(thd, SELECT_ACL, "mysql", NULL, NULL, 1, 0))
+      res= mysql_show_create_user(thd, show_user, are_both_users_same);
     break;
   }
 #endif
@@ -5391,6 +5323,8 @@ void THD::reset_for_next_command()
 
   thd->gtid_executed_warning_issued= false;
 
+  thd->reset_skip_readonly_check();
+
   DBUG_PRINT("debug",
              ("is_current_stmt_binlog_format_row(): %d",
               thd->is_current_stmt_binlog_format_row()));
@@ -5514,31 +5448,39 @@ void mysql_parse(THD *thd, Parser_state *parser_state)
     if (!err)
     {
       /*
-        See whether we can do any query rewriting. opt_general_log_raw only controls
-        writing to the general log, so rewriting still needs to happen because
-        the other logs (binlog, slow query log, ...) can not be set to raw mode
-        for security reasons.
+        Rewrite the query for logging and for the Performance Schema statement
+        tables. Raw logging happened earlier.
+      
         Query-cache only handles SELECT, which we don't rewrite, so it's no
         concern of ours.
-        We're not general-logging if we're the slave, or if we've already
-        done raw-logging earlier.
+
         Sub-routines of mysql_rewrite_query() should try to only rewrite when
         necessary (e.g. not do password obfuscation when query contains no
-        password), but we can optimize out even those necessary rewrites when
-        no logging happens at all. If rewriting does not happen here,
-        thd->rewritten_query is still empty from being reset in alloc_query().
+        password).
+      
+        If rewriting does not happen here, thd->rewritten_query is still empty
+        from being reset in alloc_query().
       */
-      bool general= !(opt_general_log_raw || thd->slave_thread);
+      // bool general= !(opt_general_log_raw || thd->slave_thread);
 
-      if (general || opt_slow_log || opt_bin_log)
+      mysql_rewrite_query(thd);
+
+      if (thd->rewritten_query.length())
       {
-        mysql_rewrite_query(thd);
+        lex->safe_to_cache_query= false; // see comments below
 
-        if (thd->rewritten_query.length())
-          lex->safe_to_cache_query= false; // see comments below
+        MYSQL_SET_STATEMENT_TEXT(thd->m_statement_psi,
+                                 thd->rewritten_query.c_ptr_safe(),
+                                 thd->rewritten_query.length());
+      }
+      else
+      {
+        MYSQL_SET_STATEMENT_TEXT(thd->m_statement_psi,
+                                 thd->query().str,
+                                 thd->query().length);
       }
 
-      if (general)
+      if (!(opt_general_log_raw || thd->slave_thread))
       {
         if (thd->rewritten_query.length())
           query_logger.general_log_write(thd, COM_QUERY,
@@ -5571,8 +5513,8 @@ void mysql_parse(THD *thd, Parser_state *parser_state)
       else
 #endif
       {
-	if (! thd->is_error())
-	{
+        if (! thd->is_error())
+        {
           /*
             Binlog logs a string starting from thd->query and having length
             thd->query_length; so we set thd->query_length correctly (to not
@@ -5612,18 +5554,39 @@ void mysql_parse(THD *thd, Parser_state *parser_state)
             error= mysql_execute_command(thd, true);
 
           MYSQL_QUERY_EXEC_DONE(error);
-	}
+        }
       }
     }
     else
     {
+      /*
+        Log the failed raw query in the Performance Schema. This statement did not
+        parse, so there is no way to tell if it may contain a password of not.
+      
+        The tradeoff is:
+          a) If we do log the query, a user typing by accident a broken query
+             containing a password will have the password exposed. This is very
+             unlikely, and this behavior can be documented. Remediation is to use
+             a new password when retyping the corrected query.
+
+          b) If we do not log the query, finding broken queries in the client
+             application will be much more difficult. This is much more likely.
+
+        Considering that broken queries can typically be generated by attempts at
+        SQL injection, finding the source of the SQL injection is critical, so the
+        design choice is to log the query text of broken queries (a).
+      */
+      MYSQL_SET_STATEMENT_TEXT(thd->m_statement_psi,
+                               thd->query().str,
+                               thd->query().length);
+
       /* Instrument this broken statement as "statement/sql/error" */
       thd->m_statement_psi= MYSQL_REFINE_STATEMENT(thd->m_statement_psi,
-                                                   sql_statement_info[SQLCOM_END].m_key);
+                                          sql_statement_info[SQLCOM_END].m_key);
 
       DBUG_ASSERT(thd->is_error());
       DBUG_PRINT("info",("Command aborted. Fatal_error: %d",
-			 thd->is_fatal_error));
+                 thd->is_fatal_error));
 
       query_cache.abort(&thd->query_cache_tls);
     }
@@ -5647,8 +5610,6 @@ void mysql_parse(THD *thd, Parser_state *parser_state)
       query, and then use the obfuscated query-string for logging
       here when the query is given again.
     */
-    thd->m_statement_psi= MYSQL_REFINE_STATEMENT(thd->m_statement_psi,
-                                                 sql_statement_info[SQLCOM_SELECT].m_key);
     if (!opt_general_log_raw)
       query_logger.general_log_write(thd, COM_QUERY, thd->query().str,
                                      thd->query().length);
@@ -5692,12 +5653,9 @@ bool mysql_test_parse_for_slave(THD *thd)
     {
       if (all_tables_not_ok(thd, lex->select_lex->table_list.first))
         ignorable= true;
-      else if (lex->sql_command != SQLCOM_BEGIN &&
-               lex->sql_command != SQLCOM_COMMIT &&
-               lex->sql_command != SQLCOM_SAVEPOINT &&
-               lex->sql_command != SQLCOM_ROLLBACK &&
-               lex->sql_command != SQLCOM_ROLLBACK_TO_SAVEPOINT &&
-               !rpl_filter->db_ok(thd->db().str))
+      else if (!check_database_filters(thd,
+                                       thd->db().str,
+                                       lex->sql_command))
         ignorable= true;
     }
     thd->m_digest= parent_digest;

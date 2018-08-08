@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -22,7 +22,6 @@
 #include "observer_trans.h"
 
 #include "sql_service_command.h"
-#include "sql_service_gr_user.h"
 
 const std::string Certifier::GTID_EXTRACTED_NAME= "gtid_extracted";
 
@@ -326,7 +325,7 @@ int Certifier::initialize_server_gtid_set(bool get_server_gtid_retrieved)
   DBUG_ENTER("initialize_server_gtid_set");
   mysql_mutex_assert_owner(&LOCK_certification_info);
   int error= 0;
-  Sql_service_command *sql_command_interface= NULL;
+  Sql_service_command_interface *sql_command_interface= NULL;
   std::string gtid_executed;
   std::string applier_retrieved_gtids;
 
@@ -369,8 +368,8 @@ int Certifier::initialize_server_gtid_set(bool get_server_gtid_retrieved)
     goto end; /* purecov: inspected */
   }
 
-  sql_command_interface= new Sql_service_command();
-  if (sql_command_interface->establish_session_connection(false) ||
+  sql_command_interface= new Sql_service_command_interface();
+  if (sql_command_interface->establish_session_connection(PSESSION_USE_THREAD) ||
       sql_command_interface->set_interface_user(GROUPREPL_USER))
   {
     log_message(MY_ERROR_LEVEL,
@@ -778,6 +777,27 @@ rpl_gno Certifier::certify(Gtid_set *snapshot_version,
   else
   {
     /*
+      Check if it is an already used GTID
+    */
+    rpl_sidno sidno_for_group_gtid_sid_map= gle->get_sidno(group_gtid_sid_map);
+    if (sidno_for_group_gtid_sid_map < 1)
+    {
+      log_message(MY_ERROR_LEVEL,
+                  "Error fetching transaction sidno after transaction"
+                  " being positively certified"); /* purecov: inspected */
+      goto end; /* purecov: inspected */
+    }
+    if (group_gtid_executed->contains_gtid(sidno_for_group_gtid_sid_map, gle->get_gno()))
+    {
+      char buf[rpl_sid::TEXT_LENGTH + 1];
+      gle->get_sid()->to_string(buf);
+
+      log_message(MY_ERROR_LEVEL,
+                  "The requested GTID '%s:%lld' was already used, the transaction will rollback"
+                  , buf, gle->get_gno());
+      goto end;
+    }
+    /*
       Add received transaction GTID to transaction snapshot version.
     */
     rpl_sidno sidno= gle->get_sidno(snapshot_version->get_sid_map());
@@ -788,6 +808,7 @@ rpl_gno Certifier::certify(Gtid_set *snapshot_version,
                   " being positively certified"); /* purecov: inspected */
       goto end; /* purecov: inspected */
     }
+
     if (snapshot_version->ensure_sidno(sidno) != RETURN_STATUS_OK)
     {
       log_message(MY_ERROR_LEVEL,
@@ -1193,6 +1214,9 @@ bool Certifier::set_group_stable_transactions_set(Gtid_set* executed_gtid_set)
 void Certifier::garbage_collect()
 {
   DBUG_ENTER("Certifier::garbage_collect");
+  DBUG_EXECUTE_IF("group_replication_do_not_clear_certification_database",
+                    { DBUG_VOID_RETURN; };);
+
   mysql_mutex_lock(&LOCK_certification_info);
 
   /*
@@ -1206,7 +1230,7 @@ void Certifier::garbage_collect()
   stable_gtid_set_lock->wrlock();
   while (it != certification_info.end())
   {
-    if (it->second->is_subset(stable_gtid_set))
+    if (it->second->is_subset_not_equals(stable_gtid_set))
     {
       if (it->second->unlink() == 0)
         delete it->second;
@@ -1668,11 +1692,6 @@ void Certifier::enable_conflict_detection()
   conflict_detection_enable= true;
   local_member_info->enable_conflict_detection();
   mysql_mutex_unlock(&LOCK_certification_info);
-
-  log_message(MY_INFORMATION_LEVEL,
-              "A new primary was elected, enabled conflict detection "
-              "until the new primary applies all relay logs");
-
   DBUG_VOID_RETURN;
 }
 

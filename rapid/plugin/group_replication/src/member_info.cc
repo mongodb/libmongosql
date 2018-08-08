@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -31,7 +31,9 @@ Group_member_info(char* hostname_arg,
                   ulonglong gtid_assignment_block_size_arg,
                   Group_member_info::Group_member_role role_arg,
                   bool in_single_primary_mode,
-                  bool has_enforces_update_everywhere_checks)
+                  bool has_enforces_update_everywhere_checks,
+                  uint member_weight_arg,
+                  uint lower_case_table_names_arg)
   : Plugin_gcs_message(CT_MEMBER_INFO_MESSAGE),
     hostname(hostname_arg), port(port_arg), uuid(uuid_arg),
     status(status_arg),
@@ -39,7 +41,9 @@ Group_member_info(char* hostname_arg,
     gtid_assignment_block_size(gtid_assignment_block_size_arg),
     unreachable(false),
     role(role_arg),
-    configuration_flags(0), conflict_detection_enable(false)
+    configuration_flags(0), conflict_detection_enable(false),
+    member_weight(member_weight_arg),
+    lower_case_table_names(lower_case_table_names_arg)
 {
   gcs_member_id= new Gcs_member_identifier(gcs_member_id_arg);
   member_version= new Member_version(member_version_arg.get_version());
@@ -66,7 +70,9 @@ Group_member_info::Group_member_info(Group_member_info& other)
     unreachable(other.is_unreachable()),
     role(other.get_role()),
     configuration_flags(other.get_configuration_flags()),
-    conflict_detection_enable(other.is_conflict_detection_enabled())
+    conflict_detection_enable(other.is_conflict_detection_enabled()),
+    member_weight(other.get_member_weight()),
+    lower_case_table_names(other.get_lower_case_table_names())
 {
   gcs_member_id= new Gcs_member_identifier(other.get_gcs_member_id()
                                                .get_member_id());
@@ -77,7 +83,8 @@ Group_member_info::Group_member_info(Group_member_info& other)
 Group_member_info::Group_member_info(const uchar* data, uint64 len)
   : Plugin_gcs_message(CT_MEMBER_INFO_MESSAGE),
     gcs_member_id(NULL), member_version(NULL),
-    unreachable(false)
+    unreachable(false),
+    lower_case_table_names(DEFAULT_NOT_RECEIVED_LOWER_CASE_TABLE_NAMES)
 {
   decode(data, len);
 }
@@ -146,6 +153,17 @@ Group_member_info::encode_payload(std::vector<unsigned char>* buffer) const
   char conflict_detection_enable_aux= conflict_detection_enable ? '1' : '0';
   encode_payload_item_char(buffer, PIT_CONFLICT_DETECTION_ENABLE,
                            conflict_detection_enable_aux);
+
+  uint16 member_weight_aux= (uint16)member_weight;
+  encode_payload_item_int2(buffer, PIT_MEMBER_WEIGHT,
+                           member_weight_aux);
+
+  uint16 lower_case_table_names_aux= static_cast <uint16> (lower_case_table_names);
+#ifndef DBUG_OFF
+  if (lower_case_table_names != SKIP_ENCODING_LOWER_CASE_TABLE_NAMES)
+#endif
+  encode_payload_item_int2(buffer, PIT_LOWER_CASE_TABLE_NAME,
+                           lower_case_table_names_aux);
 
   DBUG_VOID_RETURN;
 }
@@ -251,6 +269,24 @@ Group_member_info::decode_payload(const unsigned char* buffer,
               (conflict_detection_enable_aux == '1') ? true : false;
         }
         break;
+
+      case PIT_MEMBER_WEIGHT:
+        if (slider + payload_item_length <= end)
+        {
+          uint16 member_weight_aux= uint2korr(slider);
+          slider += payload_item_length;
+          member_weight= (uint)member_weight_aux;
+        }
+        break;
+
+      case PIT_LOWER_CASE_TABLE_NAME:
+        if (slider + payload_item_length <= end)
+        {
+          uint16 lower_case_table_names_aux= uint2korr(slider);
+          slider += payload_item_length;
+          lower_case_table_names= static_cast <uint>(lower_case_table_names_aux);
+        }
+        break;
     }
   }
 
@@ -349,6 +385,12 @@ Group_member_info::get_configuration_flags()
   return configuration_flags;
 }
 
+uint
+Group_member_info::get_lower_case_table_names() const
+{
+  return lower_case_table_names;
+}
+
 bool Group_member_info::in_primary_mode()
 {
   return get_configuration_flags() & CNF_SINGLE_PRIMARY_MODE_F;
@@ -392,10 +434,14 @@ bool Group_member_info::is_conflict_detection_enabled()
   return conflict_detection_enable;
 }
 
-bool
-Group_member_info::operator <(Group_member_info& other)
+void Group_member_info::set_member_weight(uint new_member_weight)
 {
-  return this->get_uuid().compare(other.get_uuid()) < 0;
+  member_weight= new_member_weight;
+}
+
+uint Group_member_info::get_member_weight()
+{
+  return member_weight;
 }
 
 bool
@@ -466,12 +512,52 @@ Group_member_info::get_configuration_flags_string(const uint32 configuation_flag
 }
 
 bool
-Group_member_info::comparator_group_member_info(Group_member_info *m1,
-                                                Group_member_info *m2)
+Group_member_info::comparator_group_member_version(Group_member_info *m1,
+                                                   Group_member_info *m2)
 {
-  return *m1 < *m2;
+  return m2->has_greater_version(m1);
 }
 
+bool
+Group_member_info::comparator_group_member_uuid(Group_member_info *m1,
+                                                Group_member_info *m2)
+{
+  return m1->has_lower_uuid(m2);
+}
+
+bool
+Group_member_info::comparator_group_member_weight(Group_member_info *m1,
+                                                  Group_member_info *m2)
+{
+  return m1->has_greater_weight(m2);
+}
+
+bool
+Group_member_info::has_greater_version(Group_member_info *other)
+{
+  if (*member_version > *(other->member_version))
+    return true;
+
+  return false;
+}
+
+bool
+Group_member_info::has_lower_uuid(Group_member_info *other)
+{
+  return this->get_uuid().compare(other->get_uuid()) < 0;
+}
+
+bool
+Group_member_info::has_greater_weight(Group_member_info *other)
+{
+  if (this->get_member_weight() > other->get_member_weight())
+    return true;
+
+  if (this->get_member_weight() == other->get_member_weight())
+    return has_lower_uuid(other);
+
+  return false;
+}
 
 Group_member_info_manager::
 Group_member_info_manager(Group_member_info* local_member_info)
@@ -747,6 +833,67 @@ Group_member_info_manager::decode(const uchar* to_decode, uint64 length)
   return decoded_members;
 }
 
+void
+Group_member_info_manager::
+get_primary_member_uuid(std::string &primary_member_uuid)
+{
+  map<string, Group_member_info*>::iterator it= members->begin();
+
+  for (it= members->begin(); it != members->end(); it++)
+  {
+    Group_member_info* info= (*it).second;
+    if (info->get_role() == Group_member_info::MEMBER_ROLE_PRIMARY)
+    {
+      DBUG_ASSERT(primary_member_uuid.empty());
+      primary_member_uuid =info->get_uuid();
+    }
+  }
+
+  if (primary_member_uuid.empty() ||
+      Group_member_info::MEMBER_ERROR ==
+        local_member_info->get_recovery_status())
+    primary_member_uuid= "UNDEFINED";
+}
+
+bool Group_member_info_manager::is_majority_unreachable()
+{
+  bool ret= false;
+  int unreachables= 0;
+
+  mysql_mutex_lock(&update_lock);
+  map<string, Group_member_info*>::iterator it= members->begin();
+
+  for (it= members->begin(); it != members->end(); it++)
+  {
+    Group_member_info* info= (*it).second;
+    if (info->is_unreachable())
+      unreachables++;
+  }
+  ret= (members->size() - unreachables) <= (members->size() / 2);
+  mysql_mutex_unlock(&update_lock);
+
+  return ret;
+}
+
+std::string
+Group_member_info_manager::get_string_current_view_active_hosts() const
+{
+  std::stringstream hosts_string;
+  map<string, Group_member_info*>::iterator all_members_it= members->begin();
+
+  while (all_members_it != members->end())
+  {
+    Group_member_info* member_info= (*all_members_it).second;
+    if (member_info->get_recovery_status() == Group_member_info::MEMBER_ONLINE ||
+        member_info->get_recovery_status() == Group_member_info::MEMBER_IN_RECOVERY)
+      hosts_string << member_info->get_hostname() << ":" << member_info->get_port();
+    all_members_it++;
+    if (all_members_it != members->end())
+      hosts_string<<", ";
+  }
+
+  return hosts_string.str();
+}
 
 Group_member_info_manager_message::Group_member_info_manager_message()
   : Plugin_gcs_message(CT_MEMBER_INFO_MANAGER_MESSAGE)

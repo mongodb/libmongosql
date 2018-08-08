@@ -1,4 +1,4 @@
-/* Copyright (c) 2008, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -350,14 +350,18 @@ bool has_cascade_foreign_key(TABLE *table, THD *thd)
      {"CASCADE", "SET NULL", "NO ACTION", "RESTRICT"}.
 
      Hence we are avoiding the usage of strncmp
-     ("'update_method' value with 'CASCADE'") and just comparing
-     the first character of the update_method value with 'C'.
+     ("'update_method' value with 'CASCADE' or 'SET NULL'") and just comparing
+     the first character of the update_method value with 'C' or 'S'.
     */
     if (f_key_info->update_method->str[0] == 'C' ||
-        f_key_info->delete_method->str[0] == 'C')
+        f_key_info->delete_method->str[0] == 'C' ||
+        f_key_info->update_method->str[0] == 'S' ||
+        f_key_info->delete_method->str[0] == 'S')
     {
       DBUG_ASSERT(!strncmp(f_key_info->update_method->str, "CASCADE", 7) ||
-                  !strncmp(f_key_info->delete_method->str, "CASCADE", 7));
+                  !strncmp(f_key_info->delete_method->str, "CASCADE", 7) ||
+                  !strncmp(f_key_info->update_method->str, "SET NUL", 7) ||
+                  !strncmp(f_key_info->delete_method->str, "SET NUL", 7));
       DBUG_RETURN(TRUE);
     }
   }
@@ -865,6 +869,18 @@ int Binlog_relay_IO_delegate::thread_stop(THD *thd, Master_info *mi)
 
   int ret= 0;
   FOREACH_OBSERVER(ret, thread_stop, thd, (&param));
+  return ret;
+}
+
+int Binlog_relay_IO_delegate::applier_start(THD *thd, Master_info *mi)
+{
+  Binlog_relay_IO_param param;
+  init_param(&param, mi);
+  param.server_id= thd->server_id;
+  param.thread_id= thd->thread_id();
+
+  int ret= 0;
+  FOREACH_OBSERVER(ret, applier_start, thd, (&param));
   return ret;
 }
 

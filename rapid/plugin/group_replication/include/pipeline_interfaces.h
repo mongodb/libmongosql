@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -416,7 +416,7 @@ private:
     {
       log_message(MY_ERROR_LEVEL,
                   "Unable to convert the event into a packet on the applier!"
-                  " Error: %d\n", error); /* purecov: inspected */
+                  " Error: %s.\n", get_string_log_read_error_msg(error)); /* purecov: inspected */
       return error; /* purecov: inspected */
     }
     packet= new Data_packet((uchar*)packet_data.ptr(), static_cast<ulong>(packet_data.length()));
@@ -425,6 +425,29 @@ private:
     log_event= NULL;
 
     return error;
+  }
+
+  const char* get_string_log_read_error_msg(int error)
+  {
+    switch (error)
+    {
+      case LOG_READ_BOGUS:
+        return "corrupted data in log event";
+      case LOG_READ_TOO_LARGE:
+        return "log event entry exceeded slave_max_allowed_packet; Increase "
+          "slave_max_allowed_packet";
+      case LOG_READ_IO:
+        return "I/O error reading log event";
+      case LOG_READ_MEM:
+        return "memory allocation failed reading log event, machine is out of memory";
+      case LOG_READ_TRUNC:
+        return "binlog truncated in the middle of event; consider out of disk space";
+      case LOG_READ_CHECKSUM_FAILURE:
+        return "event read from binlog did not pass checksum algorithm "
+          "check specified on --binlog-checksum option";
+      default:
+        return "unknown error reading log event";
+    }
   }
 
 private:
@@ -464,6 +487,9 @@ public:
   /**
     Wait until release.
 
+    @note The continuation will not wait if an error as occurred in the past
+          until reset_error_code() is invoked.
+
     @return the end status
       @retval 0      OK
       @retval !=0    Error returned on the execution
@@ -471,7 +497,7 @@ public:
   int wait()
   {
     mysql_mutex_lock(&lock);
-    while (!ready)
+    while (!ready && !error_code)
     {
       mysql_cond_wait(&cond, &lock); /* purecov: inspected */
     }

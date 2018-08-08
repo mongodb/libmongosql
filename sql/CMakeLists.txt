@@ -1,4 +1,4 @@
-# Copyright (c) 2006, 2017, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2006, 2018, Oracle and/or its affiliates. All rights reserved.
 # 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -119,6 +119,7 @@ SET(SQL_SHARED_SOURCES
   locking_service.cc
   log.cc
   mdl.cc
+  migrate_keyring.cc
   my_decimal.cc
   net_serv.cc
   opt_costconstantcache.cc
@@ -150,6 +151,7 @@ SET(SQL_SHARED_SOURCES
   rpl_handler.cc
   rpl_transaction_ctx.cc
   rpl_transaction_write_set_ctx.cc
+  rpl_trx_tracking.cc
   rpl_write_set_handler.cc
   rules_table_service.cc
   session_tracker.cc
@@ -182,6 +184,7 @@ SET(SQL_SHARED_SOURCES
   sql_digest.cc
   sql_do.cc 
   sql_error.cc
+  sql_exception_handler.cc
   sql_executor.cc
   sql_get_diagnostics.cc
   sql_handler.cc
@@ -261,6 +264,8 @@ SET(SQL_SOURCE
   ../sql-common/hostcheck.c
   ../sql-common/client.c
   ../sql-common/client_plugin.c
+  ../sql-common/get_password.c
+  ../sql-common/my_path_permissions.cc
   ../sql-common/my_time.c
   ../sql-common/my_user.c 
   ../sql-common/pack.c
@@ -288,6 +293,7 @@ SET(SQL_SOURCE
   srv_session.cc
   srv_session_info_service.cc
   srv_session_service.cc
+  auth/sha2_password_common.cc
   )
 
 IF(NOT WIN32)
@@ -303,20 +309,10 @@ IF(WIN32)
 ENDIF()
 
 INCLUDE(${MYSQL_CMAKE_SCRIPT_DIR}/compile_flags.cmake)
-ADD_COMPILE_FLAGS(
-  debug_sync.cc
-  handler.cc
-  geometry_rtree.cc
-  item_geofunc.cc
-  item_geofunc_buffer.cc
-  item_geofunc_internal.cc
-  item_geofunc_relchecks.cc
-  item_geofunc_relchecks_bgwrap.cc
-  item_geofunc_setops.cc
-  item_json_func.cc
-  spatial.cc
-  COMPILE_FLAGS -I${BOOST_PATCHES_DIR} -I${BOOST_INCLUDE_DIR}
-)
+INCLUDE_DIRECTORIES(SYSTEM
+  ${BOOST_PATCHES_DIR}
+  ${BOOST_INCLUDE_DIR}
+  )
 
 ADD_COMPILE_FLAGS(
   ../extra/lz4/xxhash.c
@@ -347,6 +343,14 @@ IF(HAVE_NO_UNUSED_TYPEDEFS)
   )
 ENDIF()
 
+# Segfault in boost::geometry code at high optimization levels
+IF(CMAKE_CXX_COMPILER_ID MATCHES "SunPro")
+  STRING(TOUPPER "${CMAKE_BUILD_TYPE}" CMAKEBT)
+  IF(CMAKEBT MATCHES "^REL")
+    ADD_COMPILE_FLAGS(item_geofunc_buffer.cc COMPILE_FLAGS "-xO2")
+  ENDIF()
+ENDIF()
+
 # Boost source has misleading indentation
 MY_CHECK_CXX_COMPILER_FLAG("-Wmisleading-indentation"
                            HAVE_MISLEADING_INDENTATION)
@@ -360,6 +364,16 @@ IF(HAVE_MISLEADING_INDENTATION)
     item_geofunc_relchecks_bgwrap.cc
     item_geofunc_setops.cc    
     COMPILE_FLAGS "-Wno-misleading-indentation")
+ENDIF()
+
+# gcc 7.2.0 complains:
+# boost/geometry/algorithms/detail/expand/indexed.hpp:81
+# *((void*)& box +24) may be used uninitialized
+MY_CHECK_CXX_COMPILER_FLAG("-Wmaybe-uninitialized" HAVE_MAYBE_UNINITIALIZED)
+IF(HAVE_MAYBE_UNINITIALIZED)
+  ADD_COMPILE_FLAGS(
+    geometry_rtree.cc
+    COMPILE_FLAGS "-Wno-maybe-uninitialized")
 ENDIF()
 
 MY_CHECK_CXX_COMPILER_FLAG("-fno-builtin-memcmp" HAVE_NO_BUILTIN_MEMCMP)
@@ -403,7 +417,7 @@ SET (BINLOG_SOURCE rpl_gtid_misc.cc
                    rpl_gtid_state.cc rpl_gtid_owned.cc rpl_gtid_execution.cc
                    rpl_gtid_mutex_cond_array.cc rpl_gtid_persist.cc
                    log_event.cc log_event_old.cc binlog.cc sql_binlog.cc
-                   rpl_filter.cc rpl_record.cc rpl_record_old.cc
+                   rpl_filter.cc rpl_record.cc rpl_record_old.cc rpl_trx_tracking.cc
                    rpl_utility.cc rpl_injector.cc rpl_table_access.cc)
 ADD_CONVENIENCE_LIBRARY(binlog ${BINLOG_SOURCE})
 TARGET_LINK_LIBRARIES(binlog binlogevents_static)
@@ -451,7 +465,8 @@ ELSE()
   SET(MYSQLD_SOURCE main.cc ${DTRACE_PROBES_ALL})
 ENDIF()
 
-MYSQL_ADD_EXECUTABLE(mysqld ${MYSQLD_SOURCE} DESTINATION ${INSTALL_SBINDIR} COMPONENT Server)
+MYSQL_ADD_EXECUTABLE(mysqld
+  ${MYSQLD_SOURCE} DESTINATION ${INSTALL_SBINDIR} COMPONENT Server)
 
 OPTION(DEBUG_EXTNAME "Build server as mysqld-debug (debug builds only)" OFF)
 MARK_AS_ADVANCED(DEBUG_EXTNAME)
@@ -478,28 +493,30 @@ IF(NOT WITHOUT_DYNAMIC_PLUGINS)
     SET_TARGET_PROPERTIES(mysqld PROPERTIES LINK_FLAGS "${mysqld_link_flags} -Wl,--export-all-symbols")
   ENDIF()
   IF(MSVC)
-    # Set module definition file. Also use non-incremental linker, 
-    # incremental appears to crash from time to time,if used with /DEF option
-    SET_TARGET_PROPERTIES(mysqld PROPERTIES LINK_FLAGS "${mysqld_link_flags} /DEF:mysqld.def /INCREMENTAL:NO")
+    # Set module definition file.
+    # Also use non-incremental linker, incremental appears to crash from
+    # time to time,if used with /DEF option
+    SET_TARGET_PROPERTIES(mysqld PROPERTIES LINK_FLAGS
+      "${mysqld_link_flags} /DEF:${CMAKE_CURRENT_BINARY_DIR}/mysqld.def /INCREMENTAL:NO")
 
-    FOREACH (CORELIB sql binlog slave mysys mysys_ssl dbug regex strings
-        vio binlogevents_static)
-      GET_TARGET_PROPERTY(LOC ${CORELIB} LOCATION)
-      IF (NOT LOC)
-        GET_TARGET_PROPERTY(LOC ${CORELIB} IMPORTED_LOCATION)
-      ENDIF()
-
-
-      FILE(TO_NATIVE_PATH ${LOC} LOC)
-      SET (LIB_LOCATIONS ${LIB_LOCATIONS} ${LOC}) 
-    ENDFOREACH (CORELIB ${MYSQLD_CORE_LIBS})
     SET(_PLATFORM x86)
     IF(CMAKE_SIZEOF_VOID_P EQUAL 8)
       SET(_PLATFORM  x64)
     ENDIF()
     ADD_CUSTOM_COMMAND(TARGET mysqld PRE_LINK
       COMMAND echo ${_PLATFORM} && cscript ARGS //nologo ${PROJECT_SOURCE_DIR}/win/create_def_file.js
-                  ${_PLATFORM}  ${LIB_LOCATIONS} > mysqld.def 
+      ${_PLATFORM}
+      "$<TARGET_FILE:binlog>"
+      "$<TARGET_FILE:binlogevents_static>"
+      "$<TARGET_FILE:dbug>"
+      "$<TARGET_FILE:mysys>"
+      "$<TARGET_FILE:mysys_ssl>"
+      "$<TARGET_FILE:regex>"
+      "$<TARGET_FILE:slave>"
+      "$<TARGET_FILE:sql>"
+      "$<TARGET_FILE:strings>"
+      "$<TARGET_FILE:vio>"
+      > mysqld.def
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
     ADD_DEPENDENCIES(sql GenError)
   ENDIF()
@@ -532,18 +549,16 @@ IF(WITH_MYSQLD_LDFLAGS)
      "${MYSQLD_LINK_FLAGS} ${WITH_MYSQLD_LDFLAGS}")
 ENDIF()
 
-IF(DEBUG_EXTNAME)
-  INSTALL_DEBUG_TARGET(mysqld 
-    DESTINATION ${INSTALL_SBINDIR} 
-    PDB_DESTINATION ${INSTALL_SBINDIR}
-    SUFFIX "-debug")
-ELSE()
-  INSTALL_DEBUG_TARGET(mysqld 
-    DESTINATION ${INSTALL_SBINDIR} 
-    PDB_DESTINATION ${INSTALL_SBINDIR}/debug
-    RENAME mysqld-debug)
-ENDIF()
+# Help INSTALL_DEBUG_TARGET to locate it
+SET_TARGET_PROPERTIES(mysqld PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
+# See DEBUG_EXTNAME above: mysqld may already have name mysqld-debug,
+# and the rename is a no-op. If it is called 'mysqld' we rename it.
+INSTALL_DEBUG_TARGET(mysqld
+  DESTINATION ${INSTALL_SBINDIR}
+  RENAME mysqld-debug${CMAKE_EXECUTABLE_SUFFIX}
+)
 
 # Handle out-of-source build from source package with possibly broken 
 # bison. Copy bison output to from source to build directory, if not already 
