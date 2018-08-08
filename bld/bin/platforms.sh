@@ -10,10 +10,31 @@ if [ "$PLATFORM" = '' ]; then
 fi
 
 case "$PLATFORM" in
+ubuntu1404-64)
+    CC='/opt/mongodbtoolchain/v2/bin/clang'
+    PLATFORM_ARCH='64'
+    PLATFORM_NAME='linux'
+    CMAKE_GENERATOR='Unix Makefiles'
+    CMAKE_PATH='/opt/cmake/bin'
+    ;;
+ubuntu1604-64)
+    CC='/opt/mongodbtoolchain/v2/bin/clang'
+    PLATFORM_ARCH='64'
+    PLATFORM_NAME='linux'
+    CMAKE_GENERATOR='Unix Makefiles'
+    CMAKE_PATH='/opt/cmake/bin'
+    ;;
+rhel70)
+    CC='/opt/mongodbtoolchain/v2/bin/clang'
+    PLATFORM_ARCH='64'
+    PLATFORM_NAME='linux'
+    CMAKE_GENERATOR='Unix Makefiles'
+    CMAKE_PATH='/opt/cmake/bin'
+    ;;
 macos)
     PLATFORM_ARCH='64'
     PLATFORM_NAME='darwin'
-    CMAKE_GENERATOR="Unix Makefiles"
+    CMAKE_GENERATOR='Unix Makefiles'
     CMAKE_PATH='/Applications/Cmake.app/Contents/bin'
     ;;
 win32)
@@ -34,7 +55,7 @@ win64)
     ;;
 *)
     echo "ERROR: invalid value for \$PLATFORM: '$PLATFORM'"
-    echo "Allowed values: 'win64', 'win32', 'macos'"
+    echo "Allowed values: 'win64', 'win32', 'macos', 'rhel70', 'ubuntu1404-64', 'ubuntu1604-64'"
     exit 1
     ;;
 esac
