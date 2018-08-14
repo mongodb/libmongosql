@@ -11,21 +11,18 @@ fi
 
 case "$PLATFORM" in
 ubuntu1404-64)
-    CC='/opt/mongodbtoolchain/v2/bin/clang'
     PLATFORM_ARCH='64'
     PLATFORM_NAME='linux'
     CMAKE_GENERATOR='Unix Makefiles'
     CMAKE_PATH='/opt/cmake/bin'
     ;;
 ubuntu1604-64)
-    CC='/opt/mongodbtoolchain/v2/bin/clang'
     PLATFORM_ARCH='64'
     PLATFORM_NAME='linux'
     CMAKE_GENERATOR='Unix Makefiles'
     CMAKE_PATH='/opt/cmake/bin'
     ;;
 rhel70)
-    CC='/opt/mongodbtoolchain/v2/bin/clang'
     PLATFORM_ARCH='64'
     PLATFORM_NAME='linux'
     CMAKE_GENERATOR='Unix Makefiles'
