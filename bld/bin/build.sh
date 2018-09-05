@@ -49,6 +49,15 @@ cp -r "$MONGOSQL_AUTH_ROOT"/src/mongosql-auth "$BUILD_SRC_DIR"/plugin/auth/
 cat "$MONGOSQL_AUTH_ROOT"/src/CMakeLists.txt >> "$BUILD_SRC_DIR"/plugin/auth/CMakeLists.txt
 cp "$MONGOSQL_AUTH_ROOT"/cmake/*.cmake "$BUILD_SRC_DIR"/cmake
 
+export ICU_DIR="$ARTIFACTS_DIR/icu"
+export ICU_SRC_DIR="$ICU_DIR/icu/source"
+export ICU_BUILD_DIR="$ICU_DIR/build"
+export ENABLE_ICU='ON'
+export CMAKE_ICU_ARGS="-DENABLE_ICU=$ENABLE_ICU -DICU_ROOT=$ICU_BUILD_DIR -DICU_INCLUDE_DIR=$ICU_SRC_DIR/common"
+export CMAKE_ARGS="$CMAKE_ARGS $CMAKE_ICU_ARGS"
+
+$PROJECT_ROOT/bld/bin/build-icu.sh
+
 # clear the BUILD_DIR.
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"

@@ -15,24 +15,32 @@ ubuntu1404-64)
     PLATFORM_NAME='linux'
     CMAKE_GENERATOR='Unix Makefiles'
     CMAKE_PATH='/opt/cmake/bin'
+    ICU_PLATFORM='Linux'
+    VARIANT='ubuntu1404-64'
     ;;
 ubuntu1604-64)
     PLATFORM_ARCH='64'
     PLATFORM_NAME='linux'
     CMAKE_GENERATOR='Unix Makefiles'
     CMAKE_PATH='/opt/cmake/bin'
+    ICU_PLATFORM='Linux'
+    VARIANT='ubuntu1604-64'
     ;;
 rhel70)
     PLATFORM_ARCH='64'
     PLATFORM_NAME='linux'
     CMAKE_GENERATOR='Unix Makefiles'
     CMAKE_PATH='/opt/cmake/bin'
+    ICU_PLATFORM='Linux'
+    VARIANT='rhel70'
     ;;
 macos)
     PLATFORM_ARCH='64'
     PLATFORM_NAME='darwin'
     CMAKE_GENERATOR='Unix Makefiles'
     CMAKE_PATH='/Applications/Cmake.app/Contents/bin'
+    ICU_PLATFORM='MacOSX'
+    VARIANT='macos'
     ;;
 win32)
     PLATFORM_ARCH='32'
@@ -41,6 +49,8 @@ win32)
     CMAKE_GENERATOR='Visual Studio 14 2015'
     DEVENV_PATH='/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/Common7/IDE'
     BISON_PATH='/cygdrive/c/bison/bin'
+    ICU_PLATFORM='Cygwin/MSVC'
+    VARIANT='windows-32'
     ;;
 win64)
     PLATFORM_ARCH='64'
@@ -49,6 +59,8 @@ win64)
     CMAKE_PATH='/cygdrive/c/cmake/bin'
     DEVENV_PATH='/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/Common7/IDE'
     BISON_PATH='/cygdrive/c/bison/bin'
+    ICU_PLATFORM='Cygwin/MSVC'
+    VARIANT='windows-64'
     ;;
 *)
     echo "ERROR: invalid value for \$PLATFORM: '$PLATFORM'"
