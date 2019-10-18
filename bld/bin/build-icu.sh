@@ -26,7 +26,7 @@ if [ ! -e "$ICU_SRC_DIR" ]; then
 
     echo 'downloading icu...'
     cd "$ICU_DIR"
-    curl 'http://download.icu-project.org/files/icu4c/62.1/icu4c-62_1-src.tgz' --output "$icu_archive"
+    curl 'https://newcontinuum.dl.sourceforge.net/project/icu/ICU4C/62.1/icu4c-62_1-src.tgz' --output "$icu_archive"
 
     echo 'extracting icu...'
     if [ "Windows_NT" = "$OS" ]; then
