@@ -45,6 +45,8 @@ macos)
 win32)
     PLATFORM_ARCH='32'
     PLATFORM_NAME='windows'
+	# Use OpenSSL on Windows.
+    CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=C:/openssl32"
     CMAKE_PATH='/cygdrive/c/cmake/bin'
     CMAKE_GENERATOR='Visual Studio 14 2015'
     DEVENV_PATH='/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/Common7/IDE'
@@ -55,6 +57,8 @@ win32)
 win64)
     PLATFORM_ARCH='64'
     PLATFORM_NAME='windows'
+	# Use OpenSSL on Windows.
+    CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=C:/openssl"
     CMAKE_GENERATOR='Visual Studio 14 2015 Win64'
     CMAKE_PATH='/cygdrive/c/cmake/bin'
     DEVENV_PATH='/cygdrive/c/Program Files (x86)/Microsoft Visual Studio 14.0/Common7/IDE'
