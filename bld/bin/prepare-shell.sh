@@ -29,15 +29,17 @@ BOOST_DIR="$ARTIFACTS_DIR/$BOOST_BASENAME"
 # make sure binaries we use in our scripts are available in the PATH
 PATH="$PATH:$DEVENV_PATH:$BISON_PATH:$CMAKE_PATH"
 
-# set the cmake arguments
-CMAKE_ARGS="-DWITH_BOOST=$BOOST_DIR"
+# add boost to the cmake arguments
+CMAKE_ARGS="$CMAKE_ARGS -DWITH_BOOST=$BOOST_DIR"
 platform="$(uname)"
 if [ "Linux" = "$platform" ]; then
+	# add system SSL (OpenSSL) to any Linux distro's cmake args.
     CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=system"
 fi
 
 # set the build command
 if [ "$OS" = 'Windows_NT' ]; then
+	# also set the windows CMAKE to use OpenSSL
     BUILD='devenv.com MySQL.sln /Build Release /Project mysqlclient'
     BUILD_UNIT_TESTS='devenv.com MySQL.sln /Build Release /Project wildcard_hostname_validation_unit_tests'
     RUN_UNIT_TESTS="$BUILD_DIR/Release/wildcard_hostname_validation_unit_tests.exe"
