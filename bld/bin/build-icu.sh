@@ -52,16 +52,16 @@ set +o errexit
 case $VARIANT in
 windows-64)
     # The cmd business brings all the needed compiler binaries into the shell's environment variables.
-    cmd /c "C:\Program^ Files^ ^(x86^)\Microsoft^ Visual^ Studio^ 16.0\VC\vcvarsall.bat amd64 && bash -c 'cd $ICU_BUILD_DIR ^&^& eval $CONFIGURE'"
+    cmd /c "C:\Program^ Files^ ^(x86^)\Microsoft^ Visual^ Studio\2019\Professional\VC\Auxiliary\Build\vcvarsall.bat amd64 && bash -c 'cd $ICU_BUILD_DIR ^&^& eval $CONFIGURE'"
     fail_on_error $? configure
-    cmd /c "C:\Program^ Files^ ^(x86^)\Microsoft^ Visual^ Studio^ 16.0\VC\vcvarsall.bat amd64 && bash -c 'cd $ICU_BUILD_DIR ^&^& make'"
+    cmd /c "C:\Program^ Files^ ^(x86^)\Microsoft^ Visual^ Studio\2019\Professional\VC\Auxiliary\Build\vcvarsall.bat amd64 && bash -c 'cd $ICU_BUILD_DIR ^&^& make'"
     fail_on_error $? make
     ;;
 windows-32)
     # The cmd business brings all the needed compiler binaries into the shell's environment variables.
-    cmd /c "C:\Program^ Files^ ^(x86^)\Microsoft^ Visual^ Studio^ 16.0\VC\vcvarsall.bat x86 && bash -c 'cd $ICU_BUILD_DIR ^&^& eval $CONFIGURE'"
+    cmd /c "C:\Program^ Files^ ^(x86^)\Microsoft^ Visual^ Studio\2019\Professional\VC\Auxiliary\Build\vcvarsall.bat x86 && bash -c 'cd $ICU_BUILD_DIR ^&^& eval $CONFIGURE'"
     fail_on_error $? configure
-    cmd /c "C:\Program^ Files^ ^(x86^)\Microsoft^ Visual^ Studio^ 16.0\VC\vcvarsall.bat x86 && bash -c 'cd $ICU_BUILD_DIR ^&^& make'"
+    cmd /c "C:\Program^ Files^ ^(x86^)\Microsoft^ Visual^ Studio\2019\Professional\VC\Auxiliary\Build\vcvarsall.bat x86 && bash -c 'cd $ICU_BUILD_DIR ^&^& make'"
     fail_on_error $? make
     ;;
 *)
