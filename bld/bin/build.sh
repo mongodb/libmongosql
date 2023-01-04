@@ -62,6 +62,11 @@ $PROJECT_ROOT/bld/bin/build-icu.sh
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
+echo "================================================"
+echo "$CMAKE_ARGS"
+ls /usr/local/Cellar/openssl
+echo "================================================"
+
 # run CMake in the BUILD_DIR.
 cd "$BUILD_DIR"
 if [ -n "$CMAKE_GENERATOR" ]; then
