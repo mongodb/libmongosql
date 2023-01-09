@@ -23,8 +23,13 @@ MONGOSQL_AUTH_ROOT="$PROJECT_ROOT/bld/mongosql-auth-c"
 
 if [ "$PLATFORM" = macos ]; then
     SSL_DIR="$BUILD_DIR/1.0.2n"
+    cd "$BUILD_DIR"
     curl -O https://mongo-bic-odbc-driver-resources.s3.amazonaws.com/macos/openssl-1.0.2n.zip
     unzip openssl-1.0.2n.zip
+    cd -
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    ls "$SSL_DIR"
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=$SSL_DIR -DCMAKE_VERBOSE_MAKEFILE=ON"
 fi
 
