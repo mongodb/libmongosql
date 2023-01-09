@@ -56,14 +56,11 @@ export ENABLE_ICU='ON'
 export CMAKE_ICU_ARGS="-DENABLE_ICU=$ENABLE_ICU -DICU_ROOT=$ICU_BUILD_DIR -DICU_INCLUDE_DIR=$ICU_SRC_DIR/common"
 export CMAKE_ARGS="$CMAKE_ARGS $CMAKE_ICU_ARGS"
 
-$PROJECT_ROOT/bld/bin/build-icu.sh
-
 # clear the BUILD_DIR.
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
 if [ "$PLATFORM" = macos ]; then
-    SSL_DIR="$BUILD_DIR/1.0.2n"
     cd "$BUILD_DIR"
     curl -O https://mongo-bic-odbc-driver-resources.s3.amazonaws.com/macos/openssl-1.0.2n.zip
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -73,11 +70,14 @@ if [ "$PLATFORM" = macos ]; then
     echo "PWD $PWD"
     ls "."
     ls "___________________________________"
-    echo "$SSL_DIR"
+    SSL_DIR="$PWD/1.0.2n"
+    echo "SSL_DIR: $SSL_DIR"
     ls "$SSL_DIR"
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=$SSL_DIR -DCMAKE_VERBOSE_MAKEFILE=ON"
 fi
+
+$PROJECT_ROOT/bld/bin/build-icu.sh
 
 echo "$CMAKE_ARGS"
 
