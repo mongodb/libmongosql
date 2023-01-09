@@ -68,9 +68,8 @@ if [ "$PLATFORM" = macos ]; then
     echo "???????????????????????????????"
     unzip openssl-1.0.2n.zip
     echo "PWD $PWD"
-    ls "."
-    ls "___________________________________"
-    SSL_DIR="$PWD/1.0.2n"
+    echo "___________________________________"
+    SSL_DIR="$BUILD_DIR/1.0.2n"
     echo "SSL_DIR: $SSL_DIR"
     ls "$SSL_DIR"
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
