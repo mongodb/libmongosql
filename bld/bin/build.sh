@@ -70,8 +70,10 @@ if [ "$PLATFORM" = macos ]; then
     echo "$PWD"
     echo "???????????????????????????????"
     unzip openssl-1.0.2n.zip
+    ls "PWD $PWD"
     ls "."
     ls "___________________________________"
+    echo "$SSL_DIR"
     ls "$SSL_DIR"
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=$SSL_DIR -DCMAKE_VERBOSE_MAKEFILE=ON"
