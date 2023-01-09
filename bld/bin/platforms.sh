@@ -37,13 +37,6 @@ rhel70)
 macos)
     PLATFORM_ARCH='64'
     PLATFORM_NAME='darwin'
-    SSL_DIR="$PWD/1.0.2n"
-    curl -O https://mongo-bic-odbc-driver-resources.s3.amazonaws.com/macos/openssl-1.0.2n.zip
-    unzip openssl-1.0.2n.zip
-    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-    echo "$SSL_DIR"
-    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-    CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=$SSL_DIR -DCMAKE_VERBOSE_MAKEFILE=ON"
     CMAKE_GENERATOR='Unix Makefiles'
     CMAKE_PATH='/Applications/Cmake.app/Contents/bin'
     ICU_PLATFORM='MacOSX'

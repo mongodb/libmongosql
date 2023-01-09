@@ -12,6 +12,7 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd -P)
 if [ "$OS" = "Windows_NT" ]; then
     SCRIPT_DIR="$(cygpath -m "$SCRIPT_DIR")"
 fi
+
 PROJECT_ROOT="$SCRIPT_DIR"/../..
 BUILD_DIR="$PROJECT_ROOT/bld/build"
 BUILD_SRC_DIR="$PROJECT_ROOT/bld/src"
@@ -19,6 +20,13 @@ ARTIFACTS_DIR="$PROJECT_ROOT/bld/artifacts"
 BISON_DIR="$ARTIFACTS_DIR/bison"
 MYSQL_HOME_DIR="$ARTIFACTS_DIR/mysql-home"
 MONGOSQL_AUTH_ROOT="$PROJECT_ROOT/bld/mongosql-auth-c"
+
+if [ "$PLATFORM" = macos ]; then
+    SSL_DIR="$BUILD_DIR/1.0.2n"
+    curl -O https://mongo-bic-odbc-driver-resources.s3.amazonaws.com/macos/openssl-1.0.2n.zip
+    unzip openssl-1.0.2n.zip
+    CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=$SSL_DIR -DCMAKE_VERBOSE_MAKEFILE=ON"
+fi
 
 BOOST_BASENAME='boost_1_59_0'
 BOOST_ARCHIVE_FILENAME="$BOOST_BASENAME.tar.gz"
