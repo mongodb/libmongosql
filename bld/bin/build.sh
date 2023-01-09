@@ -19,22 +19,6 @@ if [ ! -d "$BOOST_DIR" ]; then
     rm "$BOOST_ARCHIVE"
 fi
 
-if [ "$PLATFORM" = macos ]; then
-    SSL_DIR="$BUILD_DIR/1.0.2n"
-    cd "$BUILD_DIR"
-    curl -O https://mongo-bic-odbc-driver-resources.s3.amazonaws.com/macos/openssl-1.0.2n.zip
-    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-    echo "$PWD"
-    echo "???????????????????????????????"
-    unzip openssl-1.0.2n.zip
-    ls "."
-    ls "___________________________________"
-    cd -
-    ls "$SSL_DIR"
-    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-    CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=$SSL_DIR -DCMAKE_VERBOSE_MAKEFILE=ON"
-fi
-
 if [ -e "$MYSQL_HOME_DIR" ]; then
     echo "cleaning $MYSQL_HOME_DIR"
     rm -rf "$MYSQL_HOME_DIR"
@@ -77,6 +61,21 @@ $PROJECT_ROOT/bld/bin/build-icu.sh
 # clear the BUILD_DIR.
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
+
+if [ "$PLATFORM" = macos ]; then
+    SSL_DIR="$BUILD_DIR/1.0.2n"
+    cd "$BUILD_DIR"
+    curl -O https://mongo-bic-odbc-driver-resources.s3.amazonaws.com/macos/openssl-1.0.2n.zip
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "$PWD"
+    echo "???????????????????????????????"
+    unzip openssl-1.0.2n.zip
+    ls "."
+    ls "___________________________________"
+    ls "$SSL_DIR"
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=$SSL_DIR -DCMAKE_VERBOSE_MAKEFILE=ON"
+fi
 
 echo "$CMAKE_ARGS"
 
