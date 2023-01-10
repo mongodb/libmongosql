@@ -70,8 +70,6 @@ fi
 
 $PROJECT_ROOT/bld/bin/build-icu.sh
 
-echo "$CMAKE_ARGS"
-
 # run CMake in the BUILD_DIR.
 cd "$BUILD_DIR"
 if [ -n "$CMAKE_GENERATOR" ]; then
