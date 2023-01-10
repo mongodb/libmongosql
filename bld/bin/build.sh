@@ -63,16 +63,8 @@ mkdir -p "$BUILD_DIR"
 if [ "$PLATFORM" = macos ]; then
     cd "$BUILD_DIR"
     curl -O https://mongo-bic-odbc-driver-resources.s3.amazonaws.com/macos/openssl-1.0.2n.zip
-    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-    echo "$PWD"
-    echo "???????????????????????????????"
     unzip openssl-1.0.2n.zip
-    echo "PWD $PWD"
-    echo "___________________________________"
     SSL_DIR="$BUILD_DIR/1.0.2n"
-    echo "SSL_DIR: $SSL_DIR"
-    ls "$SSL_DIR"
-    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=$SSL_DIR -DCMAKE_VERBOSE_MAKEFILE=ON"
 fi
 
