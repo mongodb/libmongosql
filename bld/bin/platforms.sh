@@ -37,7 +37,6 @@ rhel70)
 macos)
     PLATFORM_ARCH='64'
     PLATFORM_NAME='darwin'
-    CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=/usr/local/Cellar/openssl/1.0.2r -DCMAKE_VERBOSE_MAKEFILE=ON"
     CMAKE_GENERATOR='Unix Makefiles'
     CMAKE_PATH='/Applications/Cmake.app/Contents/bin'
     ICU_PLATFORM='MacOSX'
