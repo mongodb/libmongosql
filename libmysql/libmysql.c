@@ -791,7 +791,8 @@ mysql_list_fields(MYSQL *mysql, const char *table, const char *wild)
   #define TABLE_NAME_SIZE 65535
   MYSQL_RES   *result;
   MYSQL_FIELD *fields;
-  char	     buff[TABLE_NAME_SIZE],*end;
+  // the buffer must be 130 characters bigger than TABLE_NAME_SIZE.
+  char	     buff[65665],*end;
   DBUG_ENTER("mysql_list_fields");
   DBUG_PRINT("enter",("table: '%s'  wild: '%s'",table,wild ? wild : ""));
 
