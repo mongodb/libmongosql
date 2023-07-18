@@ -788,14 +788,14 @@ MYSQL_FIELD *cli_list_fields(MYSQL *mysql)
 MYSQL_RES * STDCALL
 mysql_list_fields(MYSQL *mysql, const char *table, const char *wild)
 {
-  #define TABLE_SIZE 65535
+  #define TABLE_NAME_SIZE 65535
   MYSQL_RES   *result;
   MYSQL_FIELD *fields;
-  char	     buff[TABLE_SIZE],*end;
+  char	     buff[TABLE_NAME_SIZE],*end;
   DBUG_ENTER("mysql_list_fields");
   DBUG_PRINT("enter",("table: '%s'  wild: '%s'",table,wild ? wild : ""));
 
-  end=strmake(strmake(buff, table,TABLE_SIZE)+1,wild ? wild : "",TABLE_SIZE);
+  end=strmake(strmake(buff, table,TABLE_NAME_SIZE)+1,wild ? wild : "",TABLE_NAME_SIZE);
   free_old_query(mysql);
   if (simple_command(mysql, COM_FIELD_LIST, (uchar*) buff,
                      (ulong) (end-buff), 1) ||
