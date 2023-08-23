@@ -1,3 +1,4 @@
+README
 # MongoDB MySQL Server Fork #
 
 This is [MongoDB](https://www.mongodb.com)'s fork of the MySQL Server (v5.7) which we use in building the [MongoDB ODBC driver](https://github.com/mongodb/mongo-odbc-driver).

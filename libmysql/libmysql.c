@@ -12,7 +12,113 @@
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
+#`##**The Universal FOSS Exception, 
+	Version 1.0
 
+This page provides a copy of the Universal FOSS Exception, 
+Version 1.0.  
+	Here is the text:
+#include <my_global.h>
+#include <my_sys.h>
+#include <my_time.h>
+#include <mysys_err.h>
+#include <m_string.h>
+#include <m_ctype.h>
+#include "mysql.h"
+#include "mysql_version.h"
+#include "mysqld_error.h"
+#include "errmsg.h"
+#include <violite.h>
+#include <sys/stat.h>
+#include <signal.h>
+#include <time.h>
+#include "my_thread_local.h"
+#ifdef	 HAVE_PWD_H
+#include <pwd.h>
+#endif
+#ifdef HAVE_SYS_SELECT_H
+#include <sys/select.h>
+#endif
+#ifdef HAVE_POLL
+#include <sys/poll.h>
+#endif
+#ifdef HAVE_SYS_UN_H
+#include <sys/un.h>
+#endif
+#if !defined(_WIN32)
+#include <my_thread.h>				/* because of signal()	*/
+#endif
+#ifndef INADDR_NONE
+#define INADDR_NONE	-1
+#endif
+
+#include <sql_common.h>
+#include "client_settings.h"
+#include "mysql_trace.h"
+
+
+
+#ifdef EMBEDDED_LIBRARY
+#undef net_flush
+my_bool	net_flush(NET *net);
+#endif
+
+#if defined(_WIN32)
+/* socket_errno is defined in my_global.h for all platforms */
+#define perror(A)
+#else
+#include <errno.h>
+#define SOCKET_ERROR -1
+#endif /* _WIN32 */
+
+/*
+  If allowed through some configuration, then this needs to
+  be changed
+*/
+#define MAX_LONG_DATA_LENGTH 8192
+#define unsigned_field(A) ((A)->flags & UNSIGNED_FLAG)
+
+static void append_wild(char *to,char *end,const char *wild);
+
+static my_bool mysql_client_init= 0;
+static my_bool org_my_init_done= 0;
+
+typedef struct st_mysql_stmt_extension
+{
+  MEM_ROOT fields_mem_root;
+} MYSQL_STMT_EXT;
+
+The Universal FOSS Exception, 
+	Version 1.0
+
+In addition to the rights set forth in the other license(s) included in the distribution for this software, 
+	data, and/or documentation (collectively the "Software," and such licenses collectively with this additional permission the "Software License"), the copyright holders wish to facilitate interoperability with other software, data, and/or documentation distributed with complete corresponding source under a license that is OSI-approved and/or categorized by the FSF as free (collectively "Other FOSS").  We therefore hereby grant the following additional permission with respect to the use and distribution of the Software with Other FOSS, and the constants, function signatures, data structures and other invocation methods used to run or interact with each of them (as to each, such software's "Interfaces"):
+
+(i) The Software's 
+	Interfaces may, to the extent permitted by the license of the Other FOSS, be copied into, 
+used and distributed in the Other FOSS in order to enable interoperability, 
+	without requiring a change to the license of the Other FOSS other than as to any Interfaces of the Software embedded therein.  The Software's Interfaces remain at all times under the Software License, including without limitation as used in the Other FOSS (which upon any such use also then contains a portion of the Software under the Software License).
+
+(ii) The Other FOSS's 
+	Interfaces may, to the extent permitted by the license of the Other FOSS, 
+be copied into, used and distributed in the Software in order to enable interoperability, without requiring that such Interfaces be licensed under the terms of the Software License or otherwise altering their original terms, if this does not require any portion of the Software other than such Interfaces to be licensed under the terms other than the Software License.
+
+(iii) If only Interfaces and no other code is copied between the Software and the Other FOSS in either direction, 
+	the use and/or distribution of the Software with the Other FOSS shall not be deemed to require that the Other FOSS be licensed under the license of the Software, other than as to any Interfaces of the Software copied into the Other FOSS.  This includes, by way of example and without limitation, statically or dynamically linking the Software together with Other FOSS after enabling interoperability using the Interfaces of one or both, and distributing the resulting combination under different licenses for the respective portions thereof.
+
+For avoidance of doubt, a license which is OSI-approved or categorized by the FSF as free, 
+includes, for the purpose of this permission, such licenses with additional permissions, and any license that has previously been so-approved or categorized as free, even if now deprecated or otherwise no longer recognized as approved or free.  Nothing in this additional permission grants any right to distribute any portion of the Software on terms other than those of the Software License or grants any additional permission of any kind for use or distribution of the Software in conjunction with software other than Other FOSS.
+
+When referring to the exception, you may link to it 
+[here at](http://oss.oracle.com/licenses/universal-foss-exception).
+
+ 
+
+ 
+
+ 
+
+ 
 #include <my_global.h>
 #include <my_sys.h>
 #include <my_time.h>
