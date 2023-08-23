@@ -18,6 +18,75 @@
 This page provides a copy of the Universal FOSS Exception, 
 Version 1.0.  
 	Here is the text:
+#include <my_global.h>
+#include <my_sys.h>
+#include <my_time.h>
+#include <mysys_err.h>
+#include <m_string.h>
+#include <m_ctype.h>
+#include "mysql.h"
+#include "mysql_version.h"
+#include "mysqld_error.h"
+#include "errmsg.h"
+#include <violite.h>
+#include <sys/stat.h>
+#include <signal.h>
+#include <time.h>
+#include "my_thread_local.h"
+#ifdef	 HAVE_PWD_H
+#include <pwd.h>
+#endif
+#ifdef HAVE_SYS_SELECT_H
+#include <sys/select.h>
+#endif
+#ifdef HAVE_POLL
+#include <sys/poll.h>
+#endif
+#ifdef HAVE_SYS_UN_H
+#include <sys/un.h>
+#endif
+#if !defined(_WIN32)
+#include <my_thread.h>				/* because of signal()	*/
+#endif
+#ifndef INADDR_NONE
+#define INADDR_NONE	-1
+#endif
+
+#include <sql_common.h>
+#include "client_settings.h"
+#include "mysql_trace.h"
+
+
+
+#ifdef EMBEDDED_LIBRARY
+#undef net_flush
+my_bool	net_flush(NET *net);
+#endif
+
+#if defined(_WIN32)
+/* socket_errno is defined in my_global.h for all platforms */
+#define perror(A)
+#else
+#include <errno.h>
+#define SOCKET_ERROR -1
+#endif /* _WIN32 */
+
+/*
+  If allowed through some configuration, then this needs to
+  be changed
+*/
+#define MAX_LONG_DATA_LENGTH 8192
+#define unsigned_field(A) ((A)->flags & UNSIGNED_FLAG)
+
+static void append_wild(char *to,char *end,const char *wild);
+
+static my_bool mysql_client_init= 0;
+static my_bool org_my_init_done= 0;
+
+typedef struct st_mysql_stmt_extension
+{
+  MEM_ROOT fields_mem_root;
+} MYSQL_STMT_EXT;
 
 The Universal FOSS Exception, 
 	Version 1.0
