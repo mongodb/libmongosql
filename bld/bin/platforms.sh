@@ -34,6 +34,14 @@ rhel70)
     ICU_PLATFORM='Linux'
     VARIANT='rhel70'
     ;;
+rhel80)
+    PLATFORM_ARCH='64'
+    PLATFORM_NAME='linux'
+    CMAKE_GENERATOR='Unix Makefiles'
+    CMAKE_PATH='/opt/cmake/bin'
+    ICU_PLATFORM='Linux'
+    VARIANT='rhel80'
+    ;;
 macos)
     PLATFORM_ARCH='64'
     PLATFORM_NAME='darwin'
