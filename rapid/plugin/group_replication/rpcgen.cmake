@@ -87,7 +87,7 @@ FOREACH(X xcom_vp)
         ${XCOM_BASEDIR}/xcom_proto_enum.h
         ${XCOM_BASEDIR}/xcom_limits.h)
   ELSE()
-    FIND_PROGRAM(RPCGEN_EXECUTABLE rpcgen PATHS $PROJECT_ROOT DOC "path to the rpcgen executable")
+    FIND_PROGRAM(RPCGEN_EXECUTABLE rpcgen DOC "path to the rpcgen executable")
     MARK_AS_ADVANCED(RPCGEN_EXECUTABLE)
     IF(NOT RPCGEN_EXECUTABLE)
       MESSAGE(FATAL_ERROR "Could not find rpcgen")
