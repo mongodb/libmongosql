@@ -37,6 +37,22 @@ if [ "Linux" = "$platform" ]; then
     CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=system"
 fi
 
+#if [ "rhel80" = "$VARIANT" ]; then
+#  // Add hard-wired rpcgen headers for RHEL8 because they are not provided yet
+#  CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_INCLUDE_PATH=${PROJECT_ROOT}/rpc_stash/"
+#fi
+
+if [ "rhel80" = "$VARIANT" ]; then
+
+  // Manually copy rpcgen lib
+  cp $PROJECT_ROOT/rpc_stash/rpcgen /usr/bin/rpcgen
+
+  // Manually copy rpcgen headers for RHEL8 because they are not provided
+  mkdir /usr/include/tirpc
+  cp -R $PROJECT_ROOT/rpc_stash/ /usr/include/tirpc
+
+fi
+
 # set the build command
 if [ "$OS" = 'Windows_NT' ]; then
 	# also set the windows CMAKE to use OpenSSL
