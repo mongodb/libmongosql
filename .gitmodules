@@ -1,3 +1,3 @@
 [submodule "bld/mongosql-auth-c"]
 	path = bld/mongosql-auth-c
-	url = git@github.com:mongodb/mongosql-auth-c
+	url = https://github.com/mongodb/mongosql-auth-c
