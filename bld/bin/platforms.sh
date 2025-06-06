@@ -34,6 +34,14 @@ rhel70)
     ICU_PLATFORM='Linux'
     VARIANT='rhel70'
     ;;
+rhel80)
+    PLATFORM_ARCH='64'
+    PLATFORM_NAME='linux'
+    CMAKE_GENERATOR='Unix Makefiles'
+    CMAKE_PATH='/opt/cmake/bin'
+    ICU_PLATFORM='Linux'
+    VARIANT='rhel80'
+    ;;
 macos)
     PLATFORM_ARCH='64'
     PLATFORM_NAME='darwin'
@@ -68,7 +76,7 @@ win64)
     ;;
 *)
     echo "ERROR: invalid value for \$PLATFORM: '$PLATFORM'"
-    echo "Allowed values: 'win64', 'win32', 'macos', 'rhel70', 'ubuntu1404-64', 'ubuntu1604-64'"
+    echo "Allowed values: 'win64', 'win32', 'macos', 'rhel70', 'rhel80', 'ubuntu1404-64', 'ubuntu1604-64'"
     exit 1
     ;;
 esac
