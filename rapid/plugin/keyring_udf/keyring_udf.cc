@@ -1,13 +1,20 @@
-/* Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2016, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -82,7 +89,7 @@ static my_bool get_current_user(std::string *current_user)
 
   if(user.length)
     current_user->append(user.str, user.length);
-  DBUG_ASSERT(host.length);
+  assert(host.length);
   current_user->append("@").append(host.str, host.length);
 
   return FALSE;
@@ -273,9 +280,9 @@ static my_bool fetch(const char* function_name, char *key_id, char **a_key,
     return TRUE;
   }
 
-  DBUG_ASSERT((key == NULL && key_len == 0) || (key != NULL &&
-            key_len <= MAX_KEYRING_UDF_KEY_TEXT_LENGTH && key_type != NULL &&
-            strlen(key_type) <= KEYRING_UDF_KEY_TYPE_LENGTH));
+  assert((key == NULL && key_len == 0) || (key != NULL &&
+                                           key_len <= MAX_KEYRING_UDF_KEY_TEXT_LENGTH && key_type != NULL &&
+                                           strlen(key_type) <= KEYRING_UDF_KEY_TYPE_LENGTH));
 
   if (a_key != NULL)
     *a_key= key;

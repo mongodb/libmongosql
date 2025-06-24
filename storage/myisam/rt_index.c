@@ -1,14 +1,21 @@
-/* Copyright (c) 2002, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2002, 2023, Oracle and/or its affiliates.
    
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
-   
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-   
+   GNU General Public License, version 2.0, for more details.
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA */
@@ -175,14 +182,14 @@ int rtree_find_first(MI_INFO *info, uint keynr, uchar *key, uint key_length,
     // This is assumed to happen only when the index is empty. If that
     // doesn't hold, the code in mi_rkey() that checks the record
     // count has to be changed.
-    DBUG_ASSERT(info->s->state.state.records == 0);
+    assert(info->s->state.state.records == 0);
     set_my_errno(HA_ERR_END_OF_FILE);
     return -1;
   }
 
   // All empty indexes should be caught above. Negative record counts
   // should never occur.
-  DBUG_ASSERT(info->s->state.state.records > 0);
+  assert(info->s->state.state.records > 0);
 
   /*
     Save searched key, include data pointer.

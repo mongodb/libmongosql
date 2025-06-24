@@ -1,13 +1,20 @@
-/* Copyright (c) 2010, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2023, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; version 2 of the License.
+  it under the terms of the GNU General Public License, version 2.0,
+  as published by the Free Software Foundation.
+
+  This program is also distributed with certain software (including
+  but not limited to OpenSSL) that is licensed under separate terms,
+  as designated in a particular file or component or in included license
+  documentation.  The authors of MySQL hereby grant you an additional
+  permission to link the program and your derivative works with the
+  separately licensed software that they have included with MySQL.
 
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  GNU General Public License, version 2.0, for more details.
 
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software
@@ -64,9 +71,9 @@ static uchar *host_hash_get_key(const uchar *entry, size_t *length,
   const PFS_host *host;
   const void *result;
   typed_entry= reinterpret_cast<const PFS_host* const *> (entry);
-  DBUG_ASSERT(typed_entry != NULL);
+  assert(typed_entry != NULL);
   host= *typed_entry;
-  DBUG_ASSERT(host != NULL);
+  assert(host != NULL);
   *length= host->m_key.m_key_length;
   result= host->m_key.m_hash_key;
   return const_cast<uchar*> (reinterpret_cast<const uchar*> (result));
@@ -112,7 +119,7 @@ static LF_PINS* get_host_hash_pins(PFS_thread *thread)
 static void set_host_key(PFS_host_key *key,
                          const char *host, uint host_length)
 {
-  DBUG_ASSERT(host_length <= HOSTNAME_LENGTH);
+  assert(host_length <= HOSTNAME_LENGTH);
 
   char *ptr= &key->m_hash_key[0];
   if (host_length > 0)
@@ -274,11 +281,7 @@ void PFS_host::aggregate_memory(bool alive)
 
 void PFS_host::aggregate_status()
 {
-  /*
-    Aggregate STATUS_BY_HOST to:
-    - GLOBAL_STATUS
-  */
-  m_status_stats.aggregate_to(& global_status_var);
+  /* No parent to aggregate to, clean the stats */
   m_status_stats.reset();
 }
 
@@ -325,7 +328,7 @@ void purge_host(PFS_thread *thread, PFS_host *host)
                     host->m_key.m_hash_key, host->m_key.m_key_length));
   if (entry && (entry != MY_ERRPTR))
   {
-    DBUG_ASSERT(*entry == host);
+    assert(*entry == host);
     if (host->get_refcount() == 0)
     {
       lf_hash_delete(&host_hash, pins,

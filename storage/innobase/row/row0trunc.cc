@@ -1,14 +1,22 @@
 /*****************************************************************************
 
-Copyright (c) 2013, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2013, 2023, Oracle and/or its affiliates.
 
-This program is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation; version 2 of the License.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License, version 2.0,
+as published by the Free Software Foundation.
 
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is also distributed with certain software (including
+but not limited to OpenSSL) that is licensed under separate terms,
+as designated in a particular file or component or in included license
+documentation.  The authors of MySQL hereby grant you an additional
+permission to link the program and your derivative works with the
+separately licensed software that they have included with MySQL.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License, version 2.0, for more details.
 
 You should have received a copy of the GNU General Public License along with
 this program; if not, write to the Free Software Foundation, Inc.,
@@ -35,6 +43,8 @@ Created 2013-04-12 Sunny Bains
 #include "srv0start.h"
 #include "row0trunc.h"
 #include "os0file.h"
+#include "trx0purge.h"
+#include "trx0roll.h"
 #include <vector>
 
 bool	truncate_t::s_fix_up_active = false;
@@ -1227,6 +1237,10 @@ row_truncate_complete(
 	TruncateLogger*		&logger,
 	dberr_t			err)
 {
+	if (trx_purge_state() != PURGE_STATE_DISABLED) {
+		trx_purge_run();
+	}
+
 	bool	is_file_per_table = dict_table_is_file_per_table(table);
 
 	if (table->memcached_sync_count == DICT_TABLE_IN_DDL) {
@@ -1833,6 +1847,15 @@ row_truncate_table_for_mysql(
 	if (!dict_table_is_temporary(table)) {
 		/* Avoid transaction overhead for temporary table DDL. */
 		trx_start_for_ddl(trx, TRX_DICT_OP_TABLE);
+	}
+
+	/* We should wait until rollback after recovery end,
+	to lock the table consistently. */
+	trx_rollback_or_clean_wait();
+
+	if (trx_purge_state() != PURGE_STATE_DISABLED) {
+		/* We should stop purge to lock the table consistently. */
+		trx_purge_stop();
 	}
 
 	/* Step-3: Validate ownership of needed locks (Exclusive lock).

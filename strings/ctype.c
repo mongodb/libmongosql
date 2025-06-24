@@ -1,14 +1,26 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates. All rights
  * reserved.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
+
+   Without limiting anything contained in the foregoing, this file,
+   which is part of C Driver for MySQL (Connector/C), is also subject to the
+   Universal FOSS Exception, version 1.0, a copy of which can be found at
+   http://oss.oracle.com/licenses/universal-foss-exception.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -449,7 +461,7 @@ tailoring_append_abbreviation(MY_XML_PARSER *st,
 
   for ( ; (clen= scan_one_character(attr, attrend, &wc)) > 0; attr+= clen)
   {
-    DBUG_ASSERT(attr < attrend);
+    assert(attr < attrend);
     if (tailoring_append(st, fmt, clen, attr) != MY_XML_OK)
       return MY_XML_ERROR;
   }
@@ -1073,7 +1085,7 @@ my_convert(char *to, size_t to_length, const CHARSET_INFO *to_cs,
     }
   }
 
-  DBUG_ASSERT(FALSE); // Should never get to here
+  assert(FALSE); // Should never get to here
   return 0;           // Make compiler happy
 }
 
@@ -1097,7 +1109,7 @@ my_mbcharlen_ptr(const CHARSET_INFO *cs, const char *s, const char *e)
     len= my_mbcharlen_2(cs, (uchar) *s, (uchar) *(s + 1));
     /* It could be either a valid multi-byte GB18030 code, or invalid
     gb18030 code if return value is 0 */
-    DBUG_ASSERT(len == 0 || len == 2 || len == 4);
+    assert(len == 0 || len == 2 || len == 4);
   }
 
   return len;

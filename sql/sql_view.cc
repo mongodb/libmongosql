@@ -1,13 +1,20 @@
-/* Copyright (c) 2004, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2004, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -416,8 +423,8 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
   DBUG_ENTER("mysql_create_view");
 
   /* This is ensured in the parser. */
-  DBUG_ASSERT(!lex->proc_analyse && !lex->result &&
-              !lex->param_list.elements);
+  assert(!lex->proc_analyse && !lex->result &&
+         !lex->param_list.elements);
 
   /*
     We can't allow taking exclusive meta-data locks of unlocked view under
@@ -569,7 +576,7 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
         (they were not copied at derived tables processing)
       */
       tbl->table->grant.privilege= tbl->grant.privilege;
-#ifndef DBUG_OFF
+#ifndef NDEBUG
       tbl->table->grant.want_privilege= tbl->grant.want_privilege;
 #endif
     }
@@ -660,7 +667,7 @@ bool mysql_create_view(THD *thd, TABLE_LIST *views,
     
     for (sl= select_lex; sl; sl= sl->next_select())
     {
-      DBUG_ASSERT(view->db);                     /* Must be set in the parser */
+      assert(view->db);                     /* Must be set in the parser */
       List_iterator_fast<Item> it(sl->item_list);
       Item *item;
       while ((item= it++))
@@ -1170,24 +1177,8 @@ bool open_and_read_view(THD *thd, TABLE_SHARE *share,
   {
     /*
       It's an execution of a PS/SP and the view has already been unfolded
-      into a list of used tables. Now we only need to update the information
-      about granted privileges in the view tables with the actual data
-      stored in MySQL privilege system.  We don't need to restore the
-      required privileges (by calling register_want_access) because they has
-      not changed since PREPARE or the previous execution: the only case
-      when this information is changed is execution of UPDATE on a view, but
-      the original want_access is restored in its end.
-
-      Optimizer trace: because tables have been unfolded already, they are
-      in LEX::query_tables of the statement using the view. So privileges on
-      them are checked as done for explicitely listed tables, in constructor
-      of Opt_trace_start. Security context change is checked in
-      prepare_security() below.
+      into a list of used tables.
     */
-    if (!view_ref->prelocking_placeholder &&
-        view_ref->prepare_security(thd))
-      DBUG_RETURN(true);
-
     DBUG_PRINT("info",
                ("VIEW %s.%s is already processed on previous PS/SP execution",
                 view_ref->view_db.str, view_ref->view_name.str));
@@ -1228,7 +1219,7 @@ bool open_and_read_view(THD *thd, TABLE_SHARE *share,
   view_ref->definer.user.str= view_ref->definer.host.str= 0;
   view_ref->definer.user.length= view_ref->definer.host.length= 0;
 
-  DBUG_ASSERT(share->view_def != NULL);
+  assert(share->view_def != NULL);
   if (share->view_def->parse((uchar*)view_ref, thd->mem_root,
                              view_parameters, required_view_parameters,
                              &file_parser_dummy_hook))
@@ -1237,9 +1228,9 @@ bool open_and_read_view(THD *thd, TABLE_SHARE *share,
   // Check old format view .frm file
   if (!view_ref->definer.user.str)
   {
-    DBUG_ASSERT(!view_ref->definer.host.str &&
-                !view_ref->definer.user.length &&
-                !view_ref->definer.host.length);
+    assert(!view_ref->definer.host.str &&
+           !view_ref->definer.user.length &&
+           !view_ref->definer.host.length);
     push_warning_printf(thd, Sql_condition::SL_WARNING,
                         ER_VIEW_FRM_NO_USER, ER(ER_VIEW_FRM_NO_USER),
                         view_ref->db, view_ref->table_name);
@@ -1381,8 +1372,9 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref)
   thd->variables.sql_mode&= ~(MODE_PIPES_AS_CONCAT | MODE_ANSI_QUOTES |
                               MODE_IGNORE_SPACE | MODE_NO_BACKSLASH_ESCAPES);
 
-  if (thd->m_digest != NULL)
-    thd->m_digest->reset(thd->m_token_array, max_digest_length);
+  // Do not pollute the current statement
+  // with a digest of the view definition
+  assert(! parser_state.m_input.m_has_digest);
 
   // Parse the query text of the view
   result= parse_sql(thd, &parser_state, view_ref->view_creation_ctx);
@@ -1448,7 +1440,7 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref)
     view_no_suid.db= view_ref->db;
     view_no_suid.table_name= view_ref->table_name;
 
-    DBUG_ASSERT(view_tables == NULL || view_tables->security_ctx == NULL);
+    assert(view_tables == NULL || view_tables->security_ctx == NULL);
 
     if (check_table_access(thd, SELECT_ACL, view_tables,
                            false, UINT_MAX, true) ||
@@ -1674,7 +1666,7 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref)
   // Assign the context to the tables referenced in the view
   if (view_tables)
   {
-    DBUG_ASSERT(view_tables_tail);
+    assert(view_tables_tail);
     for (TABLE_LIST *tbl= view_tables;
          tbl != view_tables_tail->next_global;
          tbl= tbl->next_global)
@@ -1704,8 +1696,13 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref)
   view_select->linkage= DERIVED_TABLE_TYPE;
 
   // Updatability is not decided yet
-  DBUG_ASSERT(!view_ref->is_updatable());
+  assert(!view_ref->is_updatable());
 
+  // another level of nesting would exceed the max supported nesting level
+  if (view_ref->select_lex->nest_level >= (int) MAX_SELECT_NESTING) {
+    my_error(ER_TOO_HIGH_LEVEL_OF_NESTING_FOR_SELECT, MYF(0));
+    DBUG_RETURN(true);
+  }
   // Link query expression of view into the outer query
   view_lex->unit->include_down(old_lex, view_ref->select_lex);
 
@@ -1717,10 +1714,56 @@ bool parse_view_definition(THD *thd, TABLE_LIST *view_ref)
 
   view_ref->derived_key_list.empty();
 
-  DBUG_ASSERT(view_lex == thd->lex);
+  assert(view_lex == thd->lex);
   thd->lex= old_lex;                            // Needed for prepare_security
-  result= !view_ref->prelocking_placeholder &&
-          view_ref->prepare_security(thd);
+
+  result= view_ref->prepare_security(thd);
+
+  if (!result && old_lex->sql_command == SQLCOM_LOCK_TABLES && view_tables)
+  {
+    /*
+      For LOCK TABLES we need to check if user which security context is used
+      for view execution has necessary privileges for acquiring strong locks
+      on its underlying tables. These are LOCK TABLES and SELECT privileges.
+      Note that we only require SELECT and not LOCK TABLES on underlying
+      tables at view creation time. And these privileges might have been
+      revoked from user since then in any case.
+    */
+    assert(view_tables_tail);
+    for (TABLE_LIST *tbl= view_tables; tbl != view_tables_tail->next_global;
+         tbl= tbl->next_global)
+    {
+      bool fake_lock_tables_acl;
+      if (check_lock_view_underlying_table_access(thd, tbl,
+                                                  &fake_lock_tables_acl))
+      {
+        result= true;
+        break;
+      }
+
+      if (fake_lock_tables_acl)
+      {
+        /*
+          Do not acquire strong metadata locks for I_S and read-only/
+          truncatable-only P_S tables (i.e. for cases when we override
+          refused LOCK_TABLES_ACL). It is safe to do this since:
+          1) For read-only/truncatable-only P_S tables under LOCK TABLES
+             we do not look at locked tables, and open them separately.
+          2) Before 8.0 all I_S tables are implemented as temporary tables
+             populated by special hook, so we do not acquire metadata
+             locks or do normal open for them at all.
+        */
+        assert(belongs_to_p_s(tbl) || tbl->schema_table);
+        tbl->mdl_request.set_type(MDL_SHARED_READ);
+        /*
+          We must override thr_lock_type (which can be a write type) as
+          well. This is necessary to keep consistency with MDL and to allow
+          concurrent access to read-only and truncatable-only P_S tables.
+        */
+        tbl->lock_type= TL_READ_DEFAULT;
+      }
+    }
+  }
 
   lex_end(view_lex);
 

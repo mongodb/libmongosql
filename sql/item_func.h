@@ -1,16 +1,23 @@
 #ifndef ITEM_FUNC_INCLUDED
 #define ITEM_FUNC_INCLUDED
 
-/* Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -182,7 +189,28 @@ public:
     else
       arg_count= 0; // OOM
   }
-
+  Item_func(Item *a,Item *b,Item *c,Item *d,Item* e,Item* f):
+    allowed_arg_cols(1), arg_count(6)
+  {
+    if ((args= (Item**) sql_alloc(sizeof(Item*)*6)))
+    {
+      args[0]= a; args[1]= b; args[2]= c; args[3]= d; args[4]= e; args[5]= f;
+      with_sum_func= a->with_sum_func || b->with_sum_func ||
+      c->with_sum_func || d->with_sum_func || e->with_sum_func || f->with_sum_func;
+    }
+    else
+      arg_count= 0; // OOM
+  }
+  Item_func(const POS &pos, Item *a, Item *b, Item *c, Item *d, Item* e, Item* f)
+    : super(pos), allowed_arg_cols(1), arg_count(6)
+  {
+    if ((args= (Item**) sql_alloc(sizeof(Item*)*6)))
+    {
+      args[0]= a; args[1]= b; args[2]= c; args[3]= d; args[4]= e;args[5]= f;
+    }
+    else
+      arg_count= 0; // OOM
+  }
   Item_func(List<Item> &list);
   Item_func(const POS &pos, PT_item_list *opt_list);
 
@@ -212,7 +240,7 @@ public:
   virtual Item *key_item() const { return args[0]; }
   virtual bool const_item() const { return const_item_cache; }
   inline Item **arguments() const
-  { DBUG_ASSERT(argument_count() > 0); return args; }
+  { assert(argument_count() > 0); return args; }
   /**
     Copy arguments from list to args array
 
@@ -386,7 +414,7 @@ public:
 
   bool has_timestamp_args()
   {
-    DBUG_ASSERT(fixed == TRUE);
+    assert(fixed == TRUE);
     for (uint i= 0; i < arg_count; i++)
     {
       if (args[i]->type() == Item::FIELD_ITEM &&
@@ -398,7 +426,7 @@ public:
 
   bool has_date_args()
   {
-    DBUG_ASSERT(fixed == TRUE);
+    assert(fixed == TRUE);
     for (uint i= 0; i < arg_count; i++)
     {
       if (args[i]->type() == Item::FIELD_ITEM &&
@@ -411,7 +439,7 @@ public:
 
   bool has_time_args()
   {
-    DBUG_ASSERT(fixed == TRUE);
+    assert(fixed == TRUE);
     for (uint i= 0; i < arg_count; i++)
     {
       if (args[i]->type() == Item::FIELD_ITEM &&
@@ -424,7 +452,7 @@ public:
 
   bool has_datetime_args()
   {
-    DBUG_ASSERT(fixed == TRUE);
+    assert(fixed == TRUE);
     for (uint i= 0; i < arg_count; i++)
     {
       if (args[i]->type() == Item::FIELD_ITEM &&
@@ -549,7 +577,7 @@ public:
   String *val_str(String*str);
   my_decimal *val_decimal(my_decimal *decimal_value);
   longlong val_int()
-    { DBUG_ASSERT(fixed == 1); return (longlong) rint(val_real()); }
+  { assert(fixed == 1); return (longlong) rint(val_real()); }
   bool get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate)
   {
     return get_date_from_real(ltime, fuzzydate);
@@ -660,11 +688,11 @@ public:
 
   void fix_num_length_and_dec();
   void find_num_type();
-  String *str_op(String *str) { DBUG_ASSERT(0); return 0; }
+  String *str_op(String *str) { assert(0); return 0; }
   bool date_op(MYSQL_TIME *ltime, my_time_flags_t fuzzydate)
-  { DBUG_ASSERT(0); return 0; }
+  { assert(0); return 0; }
   bool time_op(MYSQL_TIME *ltime)
-  { DBUG_ASSERT(0); return 0; }
+  { assert(0); return 0; }
 };
 
 
@@ -684,11 +712,11 @@ class Item_num_op :public Item_func_numhybrid
   }
 
   void find_num_type();
-  String *str_op(String *str) { DBUG_ASSERT(0); return 0; }
+  String *str_op(String *str) { assert(0); return 0; }
   bool date_op(MYSQL_TIME *ltime, my_time_flags_t fuzzydate)
-  { DBUG_ASSERT(0); return 0; }
+  { assert(0); return 0; }
   bool time_op(MYSQL_TIME *ltime)
-  { DBUG_ASSERT(0); return 0; }
+  { assert(0); return 0; }
 };
 
 
@@ -757,7 +785,7 @@ public:
   const char *func_name() const { return "connection_id"; }
   void fix_length_and_dec();
   bool fix_fields(THD *thd, Item **ref);
-  longlong val_int() { DBUG_ASSERT(fixed == 1); return value; }
+  longlong val_int() { assert(fixed == 1); return value; }
   bool check_gcol_func_processor(uchar *int_arg) { return true;}
 };
 
@@ -890,7 +918,7 @@ class Item_func_div :public Item_num_op
 public:
   uint prec_increment;
   Item_func_div(const POS &pos, Item *a,Item *b) :Item_num_op(pos, a,b) {}
-  longlong int_op() { DBUG_ASSERT(0); return 0; }
+  longlong int_op() { assert(0); return 0; }
   double real_op();
   my_decimal *decimal_op(my_decimal *);
   const char *func_name() const { return "/"; }
@@ -1440,7 +1468,7 @@ class Item_func_bit_length :public Item_func_length
 public:
   Item_func_bit_length(const POS &pos, Item *a) :Item_func_length(pos, a) {}
   longlong val_int()
-    { DBUG_ASSERT(fixed == 1); return Item_func_length::val_int()*8; }
+  { assert(fixed == 1); return Item_func_length::val_int()*8; }
   const char *func_name() const { return "bit_length"; }
 };
 
@@ -1734,7 +1762,7 @@ public:
   enum Functype functype() const   { return UDF_FUNC; }
   bool fix_fields(THD *thd, Item **ref)
   {
-    DBUG_ASSERT(fixed == 0);
+    assert(fixed == 0);
     bool res= udf.fix_fields(thd, this, arg_count, args);
     used_tables_cache= udf.used_tables_cache;
     const_item_cache= udf.const_item_cache;
@@ -1811,7 +1839,7 @@ class Item_func_udf_float :public Item_udf_func
   {}
   longlong val_int()
   {
-    DBUG_ASSERT(fixed == 1);
+    assert(fixed == 1);
     return (longlong) rint(Item_func_udf_float::val_real());
   }
   my_decimal *val_decimal(my_decimal *dec_buf)
@@ -2260,12 +2288,12 @@ public:
   my_decimal *val_decimal(my_decimal *decimal_buffer);
   bool get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate)
   {
-    DBUG_ASSERT(0);
+    assert(0);
     return true;
   }
   bool get_time(MYSQL_TIME *ltime)
   {
-    DBUG_ASSERT(0);
+    assert(0);
     return true;
   }
 
@@ -2294,6 +2322,7 @@ class Item_func_get_system_var :public Item_var_func
   my_bool cached_null_value;
   query_id_t used_query_id;
   uchar cache_present;
+  Sys_var_tracker var_tracker;
 
 public:
   Item_func_get_system_var(sys_var *var_arg, enum_var_type var_type_arg,
@@ -2314,15 +2343,6 @@ public:
   { return val_decimal_from_real(dec_buf); }
   /* TODO: fix to support views */
   const char *func_name() const { return "get_system_var"; }
-  /**
-    Indicates whether this system variable is written to the binlog or not.
-
-    Variables are written to the binlog as part of "status_vars" in
-    Query_log_event, as an Intvar_log_event, or a Rand_log_event.
-
-    @return true if the variable is written to the binlog, false otherwise.
-  */
-  bool is_written_to_binlog();
   bool eq(const Item *item, bool binary_cmp) const;
 
   void cleanup();
@@ -2392,7 +2412,7 @@ public:
   bool fix_fields(THD *thd, Item **ref);
   bool eq(const Item *, bool binary_cmp) const;
   /* The following should be safe, even if we compare doubles */
-  longlong val_int() { DBUG_ASSERT(fixed == 1); return val_real() != 0.0; }
+  longlong val_int() { assert(fixed == 1); return val_real() != 0.0; }
   double val_real();
   virtual void print(String *str, enum_query_type query_type);
 
@@ -2411,8 +2431,8 @@ public:
    */
   ulonglong get_count()
   {
-    DBUG_ASSERT(ft_handler);
-    DBUG_ASSERT(table_ref->table->file->ha_table_flags() & HA_CAN_FULLTEXT_EXT);
+    assert(ft_handler);
+    assert(table_ref->table->file->ha_table_flags() & HA_CAN_FULLTEXT_EXT);
 
     return ((FT_INFO_EXT *)ft_handler)->could_you->
       count_matches((FT_INFO_EXT *)ft_handler);
@@ -2426,14 +2446,14 @@ public:
    */
   bool ordered_result()
   {
-    DBUG_ASSERT(!master);
+    assert(!master);
     if (hints->get_flags() & FT_SORTED)
       return true;
 
     if ((table_ref->table->file->ha_table_flags() & HA_CAN_FULLTEXT_EXT) == 0)
       return false;
 
-    DBUG_ASSERT(ft_handler);
+    assert(ft_handler);
     return ((FT_INFO_EXT *)ft_handler)->could_you->get_flags() & 
       FTS_ORDERED_RESULT;
   }
@@ -2446,7 +2466,7 @@ public:
    */
   bool docid_in_result()
   {
-    DBUG_ASSERT(ft_handler);
+    assert(ft_handler);
 
     if ((table_ref->table->file->ha_table_flags() & HA_CAN_FULLTEXT_EXT) == 0)
       return false;
@@ -2490,7 +2510,7 @@ public:
   */
   Ft_hints *get_hints()
   {
-    DBUG_ASSERT(!master);
+    assert(!master);
     return hints;
   }
 
@@ -2502,7 +2522,7 @@ public:
   */
   void set_hints_op(enum ft_operation type, double value_arg)
   {
-    DBUG_ASSERT(!master);
+    assert(!master);
     hints->set_hint_op(type, value_arg);
   }
   
@@ -2519,7 +2539,7 @@ public:
   */
   bool can_skip_ranking()
   {
-    DBUG_ASSERT(!master);
+    assert(!master);
     return (!(hints->get_flags() & FT_SORTED) && // FT_SORTED is no set
             used_in_where_only &&                // MATCH result is not used
                                                  // in expression
@@ -2533,7 +2553,7 @@ public:
   */
   void set_simple_expression(bool val)
   {
-    DBUG_ASSERT(!master);
+    assert(!master);
     simple_expression= val;
   }
 
@@ -2545,7 +2565,7 @@ public:
   */
   bool is_simple_expression()
   {
-    DBUG_ASSERT(!master);
+    assert(!master);
     return simple_expression;
   }
 
@@ -2591,7 +2611,7 @@ private:
     if (!(flags & FT_BOOL))
       return false;
 
-    DBUG_ASSERT(tr && tr->file);
+    assert(tr && tr->file);
 
     // Assume that if extended fulltext API is not supported,
     // non-indexed columns are allowed.  This will be true for MyISAM.
@@ -2878,7 +2898,7 @@ public:
 
 
 Item *get_system_var(Parse_context *pc, enum_var_type var_type, LEX_STRING name,
-                     LEX_STRING component);
+                     LEX_STRING component, bool unsafe);
 extern bool check_reserved_words(LEX_STRING *name);
 extern enum_field_types agg_field_type(Item **items, uint nitems);
 double my_double_round(double value, longlong dec, bool dec_unsigned,

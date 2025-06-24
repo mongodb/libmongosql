@@ -1,15 +1,21 @@
 /*
-   Copyright (c) 2004, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2004, 2023, Oracle and/or its affiliates.
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-   GNU General Public License for more details.
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -513,7 +519,7 @@ Archive_share *ha_archive::get_share(const char *table_name, int *rc)
 err:
   unlock_shared_ha_data();
 
-  DBUG_ASSERT(tmp_share || *rc);
+  assert(tmp_share || *rc);
 
   DBUG_RETURN(tmp_share);
 }
@@ -1181,7 +1187,7 @@ bool ha_archive::fix_rec_buff(unsigned int length)
   DBUG_ENTER("ha_archive::fix_rec_buff");
   DBUG_PRINT("ha_archive", ("Fixing %u for %u", 
                             length, record_buffer->length));
-  DBUG_ASSERT(record_buffer->buffer);
+  assert(record_buffer->buffer);
 
   if (length > record_buffer->length)
   {
@@ -1195,7 +1201,7 @@ bool ha_archive::fix_rec_buff(unsigned int length)
     record_buffer->length= length;
   }
 
-  DBUG_ASSERT(length <= record_buffer->length);
+  assert(length <= record_buffer->length);
 
   DBUG_RETURN(0);
 }
@@ -1227,7 +1233,7 @@ int ha_archive::unpack_row(azio_stream *file_to_read, uchar *record)
   {
     DBUG_RETURN(HA_ERR_OUT_OF_MEM);
   }
-  DBUG_ASSERT(row_len <= record_buffer->length);
+  assert(row_len <= record_buffer->length);
 
   read= azread(file_to_read, record_buffer->buffer, row_len, &error);
 
@@ -1644,7 +1650,7 @@ int ha_archive::info(uint flag)
   if (share->dirty)
   {
     DBUG_PRINT("ha_archive", ("archive flushing out rows for scan"));
-    DBUG_ASSERT(share->archive_write_open);
+    assert(share->archive_write_open);
     azflush(&(share->archive_write), Z_SYNC_FLUSH);
     share->dirty= FALSE;
   }

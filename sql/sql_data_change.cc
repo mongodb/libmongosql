@@ -1,13 +1,20 @@
-/* Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -45,7 +52,7 @@ static bool allocate_column_bitmap(TABLE *table, MY_BITMAP **bitmap)
   MY_BITMAP *the_struct;
   my_bitmap_map *the_bits;
 
-  DBUG_ASSERT(current_thd == table->in_use);
+  assert(current_thd == table->in_use);
   if (multi_alloc_root(table->in_use->mem_root,
                        &the_struct, sizeof(MY_BITMAP),
                        &the_bits, bitmap_buffer_size(number_bits),
@@ -121,7 +128,7 @@ void COPY_INFO::set_function_defaults(TABLE *table)
 {
   DBUG_ENTER("COPY_INFO::set_function_defaults");
 
-  DBUG_ASSERT(m_function_default_columns != NULL);
+  assert(m_function_default_columns != NULL);
 
   /* Quick reject test for checking the case when no defaults are invoked. */
   if (bitmap_is_clear_all(m_function_default_columns))
@@ -130,7 +137,7 @@ void COPY_INFO::set_function_defaults(TABLE *table)
   for (uint i= 0; i < table->s->fields; ++i)
     if (bitmap_is_set(m_function_default_columns, i))
     {
-      DBUG_ASSERT(bitmap_is_set(table->write_set, i));
+      assert(bitmap_is_set(table->write_set, i));
       switch (m_optype)
       {
       case INSERT_OPERATION:

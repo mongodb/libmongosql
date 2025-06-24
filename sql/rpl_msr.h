@@ -1,13 +1,20 @@
-/* Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -140,10 +147,10 @@ public:
       This class should be a singleton.
       The assert below is to prevent it to be instantiated more than once.
     */
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     static int instance_count= 0;
     instance_count++;
-    DBUG_ASSERT(instance_count == 1);
+    assert(instance_count == 1);
 #endif
     current_mi_count= 0;
     default_channel_mi= NULL;
@@ -204,10 +211,17 @@ public:
     replication_channel_map and sets index in the  multisource_mi to 0;
     And also delete the {mi, rli} pair corresponding to this channel
 
+    @note this requires the caller to hold the mi->channel_wrlock.
+    If the method succeeds the master info object is deleted and the lock
+    is released. If the an error occurs and the method return true, the {mi}
+    object wont be deleted and the caller should release the channel_wrlock.
+
     @param[in]    channel_name     Name of the channel for a Master_info
                                    object which must exist.
+
+    @return true if an error occurred, false otherwise
   */
-  void delete_mi(const char* channel_name);
+  bool delete_mi(const char* channel_name);
 
   /**
     Get the default channel for this multisourced_slave;

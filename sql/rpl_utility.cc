@@ -1,13 +1,20 @@
-/* Copyright (c) 2006, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2006, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -231,7 +238,7 @@ static void show_sql_type(enum_field_types type, uint16 metadata, String *str,
       break;
 
     default:
-      DBUG_ASSERT(0);
+      assert(0);
       break;
     }
     break;
@@ -381,7 +388,7 @@ can_convert_field_to(Field *field,
                      int *order_var)
 {
   DBUG_ENTER("can_convert_field_to");
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   char field_type_buf[MAX_FIELD_WIDTH];
   String field_type(field_type_buf, sizeof(field_type_buf), &my_charset_latin1);
   field->sql_type(field_type);
@@ -478,7 +485,7 @@ can_convert_field_to(Field *field,
         *order_var = 1;                         // Always require lossy conversions
       else
         *order_var= compare_lengths(field, source_type, metadata);
-      DBUG_ASSERT(*order_var != 0);
+      assert(*order_var != 0);
       DBUG_RETURN(is_conversion_ok(*order_var, rli));
     }
 
@@ -504,7 +511,7 @@ can_convert_field_to(Field *field,
     case MYSQL_TYPE_LONG:
     case MYSQL_TYPE_LONGLONG:
       *order_var= compare_lengths(field, source_type, metadata);
-      DBUG_ASSERT(*order_var != 0);
+      assert(*order_var != 0);
       DBUG_RETURN(is_conversion_ok(*order_var, rli));
 
     default:
@@ -624,7 +631,7 @@ table_def::compatible_with(THD *thd, Relay_log_info *rli,
       DBUG_PRINT("debug", ("Checking column %d -"
                            " field '%s' can be converted - order: %d",
                            col, field->field_name, order));
-      DBUG_ASSERT(order >= -1 && order <= 1);
+      assert(order >= -1 && order <= 1);
 
       /*
         If order is not 0, a conversion is required, so we need to set
@@ -654,8 +661,8 @@ table_def::compatible_with(THD *thd, Relay_log_info *rli,
       DBUG_PRINT("debug", ("Checking column %d -"
                            " field '%s' can not be converted",
                            col, field->field_name));
-      DBUG_ASSERT(col < size() && col < table->s->fields);
-      DBUG_ASSERT(table->s->db.str && table->s->table_name.str);
+      assert(col < size() && col < table->s->fields);
+      assert(table->s->db.str && table->s->table_name.str);
       const char *db_name= table->s->db.str;
       const char *tbl_name= table->s->table_name.str;
       char source_buf[MAX_FIELD_WIDTH];
@@ -701,7 +708,7 @@ table_def::compatible_with(THD *thd, Relay_log_info *rli,
     }
   }
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   if (tmp_table)
   {
     for (unsigned int col= 0; col < tmp_table->s->fields; ++col)
@@ -961,7 +968,7 @@ table_def::table_def(unsigned char *types, ulong size,
 table_def::~table_def()
 {
   my_free(m_memory);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   m_type= 0;
   m_size= 0;
 #endif
@@ -1150,7 +1157,7 @@ Hash_slave_rows::get(TABLE *table, MY_BITMAP *cols)
 bool Hash_slave_rows::next(HASH_ROW_ENTRY** entry)
 {
   DBUG_ENTER("Hash_slave_rows::next");
-  DBUG_ASSERT(*entry);
+  assert(*entry);
 
   if (*entry == NULL)
     DBUG_RETURN(true);
@@ -1199,7 +1206,7 @@ bool
 Hash_slave_rows::del(HASH_ROW_ENTRY *entry)
 {
   DBUG_ENTER("Hash_slave_rows::del");
-  DBUG_ASSERT(entry);
+  assert(entry);
 
   if (my_hash_delete(&m_hash, (uchar *) entry))
     DBUG_RETURN(true);
@@ -1288,7 +1295,7 @@ Hash_slave_rows::make_hash_key(TABLE *table, MY_BITMAP *cols)
           crc= checksum_crc32(crc, f->ptr, f->data_length());
           break;
       }
-#ifndef DBUG_OFF
+#ifndef NDEBUG
       String tmp;
       f->val_str(&tmp);
       DBUG_PRINT("debug", ("make_hash_entry: hash after field %s=%s: %u", f->field_name, tmp.c_ptr_safe(), crc));
@@ -1346,7 +1353,7 @@ bool Deferred_log_events::execute(Relay_log_info *rli)
 {
   bool res= false;
 
-  DBUG_ASSERT(rli->deferred_events_collecting);
+  assert(rli->deferred_events_collecting);
 
   rli->deferred_events_collecting= false;
   for (Log_event **it= m_array.begin(); !res && it != m_array.end(); ++it)

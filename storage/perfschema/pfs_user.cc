@@ -1,13 +1,20 @@
-/* Copyright (c) 2010, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2023, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; version 2 of the License.
+  it under the terms of the GNU General Public License, version 2.0,
+  as published by the Free Software Foundation.
+
+  This program is also distributed with certain software (including
+  but not limited to OpenSSL) that is licensed under separate terms,
+  as designated in a particular file or component or in included license
+  documentation.  The authors of MySQL hereby grant you an additional
+  permission to link the program and your derivative works with the
+  separately licensed software that they have included with MySQL.
 
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  GNU General Public License, version 2.0, for more details.
 
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software
@@ -64,9 +71,9 @@ static uchar *user_hash_get_key(const uchar *entry, size_t *length,
   const PFS_user *user;
   const void *result;
   typed_entry= reinterpret_cast<const PFS_user* const *> (entry);
-  DBUG_ASSERT(typed_entry != NULL);
+  assert(typed_entry != NULL);
   user= *typed_entry;
-  DBUG_ASSERT(user != NULL);
+  assert(user != NULL);
   *length= user->m_key.m_key_length;
   result= user->m_key.m_hash_key;
   return const_cast<uchar*> (reinterpret_cast<const uchar*> (result));
@@ -112,7 +119,7 @@ static LF_PINS* get_user_hash_pins(PFS_thread *thread)
 static void set_user_key(PFS_user_key *key,
                          const char *user, uint user_length)
 {
-  DBUG_ASSERT(user_length <= USERNAME_LENGTH);
+  assert(user_length <= USERNAME_LENGTH);
 
   char *ptr= &key->m_hash_key[0];
   if (user_length > 0)
@@ -286,7 +293,7 @@ void purge_user(PFS_thread *thread, PFS_user *user)
                     user->m_key.m_hash_key, user->m_key.m_key_length));
   if (entry && (entry != MY_ERRPTR))
   {
-    DBUG_ASSERT(*entry == user);
+    assert(*entry == user);
     if (user->get_refcount() == 0)
     {
       lf_hash_delete(&user_hash, pins,

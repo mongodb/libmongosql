@@ -1,14 +1,21 @@
 /*
-   Copyright (c) 2012, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2012, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -641,7 +648,7 @@ ExceptionsTableWriter::writeRow(NdbTransaction* trans,
                       op_type, m_op_type_pos,
                       conflict_cause, m_conflict_cause_pos,
                       orig_transid, m_orig_transid_pos));
-  DBUG_ASSERT(write_set != NULL);
+  assert(write_set != NULL);
   assert(err.code == 0);
   const uchar* rowPtr= (op_type == DELETE_ROW)? oldRowPtr : newRowPtr;
 
@@ -759,7 +766,7 @@ ExceptionsTableWriter::writeRow(NdbTransaction* trans,
       int k;
       for (k= 0; k < nkey; k++)
       {
-        DBUG_ASSERT(rowPtr != NULL);
+        assert(rowPtr != NULL);
         if (m_key_data_pos[k] != -1)
         {
           const uchar* data=
@@ -785,7 +792,7 @@ ExceptionsTableWriter::writeRow(NdbTransaction* trans,
         const uchar* default_value=  (const uchar*) col->getDefaultValue();
         DBUG_PRINT("info", ("Checking column %s(%i)%s", col->getName(), i,
                             (default_value)?", has default value":""));
-        DBUG_ASSERT(rowPtr != NULL);
+        assert(rowPtr != NULL);
         if (m_data_pos[i] != -1)
         {
           const uchar* row_vPtr= NULL;
@@ -1941,23 +1948,23 @@ row_conflict_fn_old(NDB_CONFLICT_FN_SHARE* cfn_share,
     r= code->load_const_u32(RegOldValue, old_value_32);
   else
     r= code->load_const_u64(RegOldValue, old_value_64);
-  DBUG_ASSERT(r == 0);
+  assert(r == 0);
   r= code->read_attr(RegCurrentValue, resolve_column);
-  DBUG_ASSERT(r == 0);
+  assert(r == 0);
   /*
    * if RegOldValue == RegCurrentValue goto label_0
    * else raise error for this row
    */
   r= code->branch_eq(RegOldValue, RegCurrentValue, label_0);
-  DBUG_ASSERT(r == 0);
+  assert(r == 0);
   r= code->interpret_exit_nok(error_conflict_fn_violation);
-  DBUG_ASSERT(r == 0);
+  assert(r == 0);
   r= code->def_label(label_0);
-  DBUG_ASSERT(r == 0);
+  assert(r == 0);
   r= code->interpret_exit_ok();
-  DBUG_ASSERT(r == 0);
+  assert(r == 0);
   r= code->finalise();
-  DBUG_ASSERT(r == 0);
+  assert(r == 0);
   DBUG_RETURN(r);
 }
 
@@ -2023,23 +2030,23 @@ row_conflict_fn_max_update_only(NDB_CONFLICT_FN_SHARE* cfn_share,
     r= code->load_const_u32(RegNewValue, new_value_32);
   else
     r= code->load_const_u64(RegNewValue, new_value_64);
-  DBUG_ASSERT(r == 0);
+  assert(r == 0);
   r= code->read_attr(RegCurrentValue, resolve_column);
-  DBUG_ASSERT(r == 0);
+  assert(r == 0);
   /*
    * if RegNewValue > RegCurrentValue goto label_0
    * else raise error for this row
    */
   r= code->branch_gt(RegNewValue, RegCurrentValue, label_0);
-  DBUG_ASSERT(r == 0);
+  assert(r == 0);
   r= code->interpret_exit_nok(error_conflict_fn_violation);
-  DBUG_ASSERT(r == 0);
+  assert(r == 0);
   r= code->def_label(label_0);
-  DBUG_ASSERT(r == 0);
+  assert(r == 0);
   r= code->interpret_exit_ok();
-  DBUG_ASSERT(r == 0);
+  assert(r == 0);
   r= code->finalise();
-  DBUG_ASSERT(r == 0);
+  assert(r == 0);
   DBUG_RETURN(r);
 }
 

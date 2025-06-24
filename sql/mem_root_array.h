@@ -1,13 +1,20 @@
-/* Copyright (c) 2011, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2011, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -52,7 +59,7 @@ public:
 
   void init(MEM_ROOT *root)
   {
-    DBUG_ASSERT(root != NULL);
+    assert(root != NULL);
 
     m_root= root;
     m_array= NULL;
@@ -67,18 +74,18 @@ public:
   void set_mem_root(MEM_ROOT *new_root)
   {
     m_root= new_root;
-    DBUG_ASSERT(m_root != NULL);
+    assert(m_root != NULL);
   }
 
   Element_type &at(size_t n)
   {
-    DBUG_ASSERT(n < size());
+    assert(n < size());
     return m_array[n];
   }
 
   const Element_type &at(size_t n) const
   {
-    DBUG_ASSERT(n < size());
+    assert(n < size());
     return m_array[n];
   }
 
@@ -113,7 +120,7 @@ public:
   */
   void chop(const size_t pos)
   {
-    DBUG_ASSERT(pos < m_size);
+    assert(pos < m_size);
     if (!has_trivial_destructor)
     {
       for (size_t ix= pos; ix < m_size; ++ix)
@@ -185,7 +192,7 @@ public:
    */
   void pop_back()
   {
-    DBUG_ASSERT(!empty());
+    assert(!empty());
     if (!has_trivial_destructor)
       back().~Element_type();
     m_size-= 1;

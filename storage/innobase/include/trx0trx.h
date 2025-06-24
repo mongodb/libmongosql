@@ -1,14 +1,22 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2017, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2023, Oracle and/or its affiliates.
 
-This program is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation; version 2 of the License.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License, version 2.0,
+as published by the Free Software Foundation.
 
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is also distributed with certain software (including
+but not limited to OpenSSL) that is licensed under separate terms,
+as designated in a particular file or component or in included license
+documentation.  The authors of MySQL hereby grant you an additional
+permission to link the program and your derivative works with the
+separately licensed software that they have included with MySQL.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License, version 2.0, for more details.
 
 You should have received a copy of the GNU General Public License along with
 this program; if not, write to the Free Software Foundation, Inc.,
@@ -89,11 +97,11 @@ trx_set_detailed_error_from_file(
 	trx_t*	trx,	/*!< in: transaction struct */
 	FILE*	file);	/*!< in: file to read message from */
 /****************************************************************//**
-Retrieves the error_info field from a trx.
+Retrieves the index causing the error from a trx.
 @return the error info */
 UNIV_INLINE
 const dict_index_t*
-trx_get_error_info(
+trx_get_error_index(
 /*===============*/
 	const trx_t*	trx);	/*!< in: trx object */
 /********************************************************************//**
@@ -370,7 +378,7 @@ trx_print_low(
 			/*!< in: transaction */
 	ulint		max_query_len,
 			/*!< in: max query length to print,
-			or 0 to use the default max length */
+			must be positive */ 
 	ulint		n_rec_locks,
 			/*!< in: lock_number_of_rows_locked(&trx->lock) */
 	ulint		n_trx_locks,
@@ -388,7 +396,7 @@ trx_print_latched(
 	FILE*		f,		/*!< in: output stream */
 	const trx_t*	trx,		/*!< in: transaction */
 	ulint		max_query_len);	/*!< in: max query length to print,
-					or 0 to use the default max length */
+					  must be positive */
 
 /**********************************************************************//**
 Prints info about a transaction.
@@ -399,7 +407,7 @@ trx_print(
 	FILE*		f,		/*!< in: output stream */
 	const trx_t*	trx,		/*!< in: transaction */
 	ulint		max_query_len);	/*!< in: max query length to print,
-					or 0 to use the default max length */
+					 must be positive */
 
 /**********************************************************************//**
 Determine if a transaction is a dictionary operation.
@@ -1141,7 +1149,7 @@ struct trx_t {
 					doing the transaction is allowed to
 					set this field: this is NOT protected
 					by any mutex */
-	const dict_index_t*error_info;	/*!< if the error number indicates a
+	const dict_index_t*error_index;	/*!< if the error number indicates a
 					duplicate key error, a pointer to
 					the problematic index is stored here */
 	ulint		error_key_num;	/*!< if the index creation fails to a

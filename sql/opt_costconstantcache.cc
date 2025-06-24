@@ -1,14 +1,21 @@
 /*
-   Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -21,7 +28,7 @@
 #include "field.h"                              // Field
 #include "log.h"                                // sql_print_warning
 #include "m_string.h"                           // LEX_CSTRING
-#include "my_dbug.h"                            // DBUG_ASSERT
+#include "my_dbug.h"                            // assert
 #include "opt_costconstants.h"
 #include "opt_costconstantcache.h"
 #include "template_utils.h"                     // pointer_cast
@@ -55,8 +62,8 @@ Cost_constant_cache::Cost_constant_cache()
 Cost_constant_cache::~Cost_constant_cache()
 {
   // Verify that close has been called
-  DBUG_ASSERT(current_cost_constants == NULL);
-  DBUG_ASSERT(m_inited == false);
+  assert(current_cost_constants == NULL);
+  assert(m_inited == false);
 }
 
 
@@ -64,7 +71,7 @@ void Cost_constant_cache::init()
 {
   DBUG_ENTER("Cost_constant_cache::init");
 
-  DBUG_ASSERT(m_inited == false);
+  assert(m_inited == false);
 
   // Initialize the mutex that is used for protecting the cost constants
   mysql_mutex_init(key_LOCK_cost_const, &LOCK_cost_const,
@@ -86,7 +93,7 @@ void Cost_constant_cache::close()
 {
   DBUG_ENTER("Cost_constant_cache::close");
 
-  DBUG_ASSERT(m_inited);
+  assert(m_inited);
 
   if (m_inited == false)
     DBUG_VOID_RETURN;                           /* purecov: inspected */
@@ -113,7 +120,7 @@ void Cost_constant_cache::close()
 void Cost_constant_cache::reload()
 {
   DBUG_ENTER("Cost_constant_cache::reload");
-  DBUG_ASSERT(m_inited= true);
+  assert(m_inited= true);
 
   // Create cost constants from the constants defined in the source code
   Cost_model_constants *cost_constants= create_defaults();
@@ -197,7 +204,7 @@ static void report_server_cost_warnings(const LEX_CSTRING &cost_name,
                       cost_name.str, value);
     break;
   default:
-    DBUG_ASSERT(false);                         /* purecov: inspected */
+    assert(false);                         /* purecov: inspected */
   }
 }
 
@@ -239,7 +246,7 @@ static void report_engine_cost_warnings(const LEX_CSTRING &se_name,
                       cost_name.str, se_name.str, storage_category, value);
     break;
   default:
-    DBUG_ASSERT(false);                         /* purecov: inspected */
+    assert(false);                         /* purecov: inspected */
   }
 }
 
@@ -432,7 +439,7 @@ static void read_cost_constants(Cost_model_constants* cost_constants)
 
   // Create and initialize a new THD.
   THD *thd= new THD;
-  DBUG_ASSERT(thd);
+  assert(thd);
   thd->thread_stack= pointer_cast<char*>(&thd);
   thd->store_globals();
   lex_start(thd);
@@ -449,8 +456,8 @@ static void read_cost_constants(Cost_model_constants* cost_constants)
 
   if (!open_and_lock_tables(thd, tables, MYSQL_LOCK_IGNORE_TIMEOUT))
   {
-    DBUG_ASSERT(tables[0].table != NULL);
-    DBUG_ASSERT(tables[1].table != NULL);
+    assert(tables[0].table != NULL);
+    assert(tables[1].table != NULL);
 
     // Read the server constants table
     read_server_cost_constants(thd, tables[0].table, cost_constants);
@@ -479,7 +486,7 @@ static void read_cost_constants(Cost_model_constants* cost_constants)
 
 void init_optimizer_cost_module(bool enable_plugins)
 {
-  DBUG_ASSERT(cost_constant_cache == NULL);
+  assert(cost_constant_cache == NULL);
   cost_constant_cache= new Cost_constant_cache();
   cost_constant_cache->init();
   /*

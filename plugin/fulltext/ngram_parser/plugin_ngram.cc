@@ -1,13 +1,20 @@
-/* Copyright (c) 2014, 2018 Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -47,7 +54,7 @@ ngram_parse(
 	int	ret = 0;
 	bool	is_first = true;
 
-	DBUG_ASSERT(cs->mbminlen == 1);
+	assert(cs->mbminlen == 1);
 
 	start = const_cast<char*>(doc);
 	next = start;
@@ -100,8 +107,8 @@ ngram_parse(
 	case MYSQL_FTPARSER_FULL_BOOLEAN_INFO:
 	case MYSQL_FTPARSER_WITH_STOPWORDS:
 		if (n_chars > 0 && is_first) {
-			DBUG_ASSERT(next > start);
-			DBUG_ASSERT(n_chars < ngram_token_size);
+                  assert(next > start);
+                  assert(n_chars < ngram_token_size);
 
 			ret = param->mysql_add_word(
 				param, start, next - start, bool_info);
@@ -165,9 +172,9 @@ ngram_term_convert(
 	int	token_size;
 	int	ret = 0;
 
-	DBUG_ASSERT(bool_info->type == FT_TOKEN_WORD);
-	DBUG_ASSERT(bool_info->quot == NULL);
-	DBUG_ASSERT(cs->mbminlen == 1);
+	assert(bool_info->type == FT_TOKEN_WORD);
+	assert(bool_info->quot == NULL);
+	assert(cs->mbminlen == 1);
 
 	/* Convert rules:
 	1. if term with wildcard and term length is less than ngram_token_size,
@@ -192,7 +199,7 @@ ngram_term_convert(
 		bool_info->type = FT_TOKEN_RIGHT_PAREN;
 		ret = param->mysql_add_word(param, NULL, 0, bool_info);
 
-		DBUG_ASSERT(bool_info->quot == NULL);
+		assert(bool_info->quot == NULL);
 		bool_info->type = FT_TOKEN_WORD;
 	}
 
@@ -244,9 +251,9 @@ ngram_parser_parse(
 						reinterpret_cast<char*>(word.pos),
 						word.len,
 						&bool_info);
-					DBUG_ASSERT(bool_info.quot == NULL);
-					DBUG_ASSERT(bool_info.type
-						== FT_TOKEN_WORD);
+					assert(bool_info.quot == NULL);
+					assert(bool_info.type
+                                               == FT_TOKEN_WORD);
 				}
 			} else {
 				ret = param->mysql_add_word(

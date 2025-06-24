@@ -1,13 +1,20 @@
-/* Copyright (c) 2008, 2014, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2008, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -91,7 +98,7 @@ void Sql_cmd_common_signal::assign_defaults(
 
 void Sql_cmd_common_signal::eval_defaults(THD *thd, Sql_condition *cond)
 {
-  DBUG_ASSERT(cond);
+  assert(cond);
 
   const char* sqlstate;
   bool set_defaults= (m_cond != 0);
@@ -101,16 +108,16 @@ void Sql_cmd_common_signal::eval_defaults(THD *thd, Sql_condition *cond)
     /*
       SIGNAL is restricted in sql_yacc.yy to only signal SQLSTATE conditions.
     */
-    DBUG_ASSERT(m_cond->type == sp_condition_value::SQLSTATE);
+    assert(m_cond->type == sp_condition_value::SQLSTATE);
     sqlstate= m_cond->sql_state;
     cond->set_returned_sqlstate(sqlstate);
   }
   else
     sqlstate= cond->returned_sqlstate();
 
-  DBUG_ASSERT(sqlstate);
+  assert(sqlstate);
   /* SQLSTATE class "00": illegal, rejected in the parser. */
-  DBUG_ASSERT(!is_sqlstate_completion(sqlstate));
+  assert(!is_sqlstate_completion(sqlstate));
 
   if (is_sqlstate_warning(sqlstate))
   {
@@ -190,7 +197,7 @@ static bool assign_fixed_string(MEM_ROOT *mem_root,
                                           & well_formed_error_pos,
                                           & cannot_convert_error_pos,
                                           & from_end_pos);
-      DBUG_ASSERT(dst_copied <= dst_len);
+      assert(dst_copied <= dst_len);
       dst_len= dst_copied; /* In case the copy truncated the data */
       dst_str[dst_copied]= '\0';
     }
@@ -418,15 +425,15 @@ bool Sql_cmd_signal::execute(THD *thd)
   thd->set_row_count_func(0);
   thd->get_stmt_da()->reset_condition_info(thd);
 
-  DBUG_ASSERT(thd->lex->query_tables == NULL);
+  assert(thd->lex->query_tables == NULL);
 
   eval_defaults(thd, &cond);
   if (eval_signal_informations(thd, &cond))
     DBUG_RETURN(true);
 
   /* SIGNAL should not signal SL_NOTE */
-  DBUG_ASSERT((cond.severity() == Sql_condition::SL_WARNING) ||
-              (cond.severity() == Sql_condition::SL_ERROR));
+  assert((cond.severity() == Sql_condition::SL_WARNING) ||
+         (cond.severity() == Sql_condition::SL_ERROR));
 
   Sql_condition *raised= thd->raise_condition(cond.mysql_errno(),
                                               cond.returned_sqlstate(),
@@ -522,9 +529,9 @@ bool Sql_cmd_resignal::execute(THD *thd)
   }
 
   // RESIGNAL should not resignal SL_NOTE
-  DBUG_ASSERT(!raised ||
-              (raised->severity() == Sql_condition::SL_WARNING) ||
-              (raised->severity() == Sql_condition::SL_ERROR));
+  assert(!raised ||
+         (raised->severity() == Sql_condition::SL_WARNING) ||
+         (raised->severity() == Sql_condition::SL_ERROR));
 
   /*
     We now have the following possibilities:

@@ -1,14 +1,21 @@
-/* Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights
+/* Copyright (c) 2008, 2023, Oracle and/or its affiliates. All rights
    reserved.
 
   This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; version 2 of the License.
+  it under the terms of the GNU General Public License, version 2.0,
+  as published by the Free Software Foundation.
+
+  This program is also distributed with certain software (including
+  but not limited to OpenSSL) that is licensed under separate terms,
+  as designated in a particular file or component or in included license
+  documentation.  The authors of MySQL hereby grant you an additional
+  permission to link the program and your derivative works with the
+  separately licensed software that they have included with MySQL.
 
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  GNU General Public License, version 2.0, for more details.
 
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software Foundation,
@@ -50,8 +57,8 @@ bool pfs_initialized= false;
 */
 void *pfs_malloc(PFS_builtin_memory_class *klass, size_t size, myf flags)
 {
-  DBUG_ASSERT(klass != NULL);
-  DBUG_ASSERT(size > 0);
+  assert(klass != NULL);
+  assert(size > 0);
 
   void *ptr= NULL;
 
@@ -128,9 +135,9 @@ void pfs_free(PFS_builtin_memory_class *klass, size_t size, void *ptr)
 */
 void *pfs_malloc_array(PFS_builtin_memory_class *klass, size_t n, size_t size, myf flags)
 {
-  DBUG_ASSERT(klass != NULL);
-  DBUG_ASSERT(n > 0);
-  DBUG_ASSERT(size > 0);
+  assert(klass != NULL);
+  assert(n > 0);
+  assert(size > 0);
   void *ptr= NULL;
   size_t array_size= n * size;
   /* Check for overflow before allocating. */
@@ -163,7 +170,7 @@ void pfs_free_array(PFS_builtin_memory_class *klass, size_t n, size_t size, void
     return;
   size_t array_size= n * size;
   /* Overflow should have been detected by pfs_malloc_array. */
-  DBUG_ASSERT(!is_overflow(array_size, n, size));
+  assert(!is_overflow(array_size, n, size));
   return pfs_free(klass, array_size, ptr);
 }
 
@@ -206,9 +213,9 @@ uint pfs_get_socket_address(char *host,
                             const struct sockaddr_storage *src_addr,
                             socklen_t src_len)
 {
-  DBUG_ASSERT(host);
-  DBUG_ASSERT(src_addr);
-  DBUG_ASSERT(port);
+  assert(host);
+  assert(src_addr);
+  assert(port);
 
   memset(host, 0, host_len);
   *port= 0;

@@ -9,7 +9,7 @@
 # 2. Stop replication on M1. On M2 lock a table to block recovery. Start M1.
 # 3. Execute a STOP SLAVE command and see the recovery channel still active.
 # 4. Execute a RESET SLAVE ALL command and see the recovery channel is not
-#    affected on M1.
+#    affected on M1 when GR node is active.
 # 5. Kill the server M1. The recovery channel should still be there but it's
 #    not started. Recreate the slave channel to test that it started
 # 6. Clean the created channels and tables.
@@ -84,7 +84,8 @@ STOP SLAVE;
 --source include/assert.inc
 
 #
-# Phase 4: Execute a RESET SLAVE ALL command and see the channel is not affected
+# Phase 4: Execute a RESET SLAVE ALL command and see the recovery channel is
+# not affected as GR node is active.
 #
 
 --connection server1
@@ -104,6 +105,7 @@ SET GLOBAL SUPER_READ_ONLY=0; # Bug#22097534
 --let $recovery_relay_log_index= `SELECT CONCAT('$datadir_1', 'mgr-group_replication_recovery.index')`
 --file_exists $recovery_relay_log_index
 
+--error ER_SLAVE_CHANNEL_OPERATION_NOT_ALLOWED
 RESET SLAVE ALL;
 
 --let $assert_text= 'The group replication recovery channel is present'
@@ -139,10 +141,11 @@ RESET SLAVE ALL;
 
 --let $_group_replication_local_address= `SELECT @@GLOBAL.group_replication_local_address`
 --let $_group_replication_group_seeds= `SELECT @@GLOBAL.group_replication_group_seeds`
+--let $_group_replication_group_whitelist= `SELECT @@GLOBAL.group_replication_ip_whitelist`
 
 # kill server 1
---let $restart_parameters=restart:--group_replication_local_address=$_group_replication_local_address --group_replication_group_seeds=$_group_replication_group_seeds
---replace_result $_group_replication_local_address GROUP_REPLICATION_LOCAL_ADDRESS $_group_replication_group_seeds GROUP_REPLICATION_GROUP_SEEDS
+--let $restart_parameters=restart:--group_replication_local_address=$_group_replication_local_address --group_replication_group_seeds=$_group_replication_group_seeds --group_replication_ip_whitelist=$_group_replication_group_whitelist
+--replace_result $_group_replication_local_address GROUP_REPLICATION_LOCAL_ADDRESS $_group_replication_group_seeds GROUP_REPLICATION_GROUP_SEEDS $_group_replication_group_whitelist GROUP_REPLICATION_GROUP_WHITELIST
 --source ../inc/kill_and_restart_mysqld.inc
 
 #Needed as we are not using rpl_restart_server.inc

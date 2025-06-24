@@ -1,13 +1,25 @@
-/* Copyright (c) 2002, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2002, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
+
+   Without limiting anything contained in the foregoing, this file,
+   which is part of C Driver for MySQL (Connector/C), is also subject to the
+   Universal FOSS Exception, version 1.0, a copy of which can be found at
+   http://oss.oracle.com/licenses/universal-foss-exception.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -79,9 +91,9 @@ size_t my_caseup_mb(const CHARSET_INFO *cs, char *src, size_t srclen,
   char *srcend= src + srclen;
   const uchar *map= cs->to_upper;
 
-  DBUG_ASSERT(cs->caseup_multiply == 1);
-  DBUG_ASSERT(src == dst && srclen == dstlen);
-  DBUG_ASSERT(cs->mbmaxlen == 2);
+  assert(cs->caseup_multiply == 1);
+  assert(src == dst && srclen == dstlen);
+  assert(cs->mbmaxlen == 2);
 
   while (src < srcend)
   {
@@ -114,9 +126,9 @@ size_t my_casedn_mb(const CHARSET_INFO *cs, char *src, size_t srclen,
   char *srcend= src + srclen;
   const uchar *map=cs->to_lower;
 
-  DBUG_ASSERT(cs->casedn_multiply == 1);
-  DBUG_ASSERT(src == dst && srclen == dstlen);
-  DBUG_ASSERT(cs->mbmaxlen == 2);
+  assert(cs->casedn_multiply == 1);
+  assert(src == dst && srclen == dstlen);
+  assert(cs->mbmaxlen == 2);
 
   while (src < srcend)
   {
@@ -159,7 +171,7 @@ my_casefold_mb_varlen(const CHARSET_INFO *cs,
 {
   char *srcend= src + srclen, *dst0= dst;
 
-  DBUG_ASSERT(cs->mbmaxlen == 2);
+  assert(cs->mbmaxlen == 2);
 
   while (src < srcend)
   {
@@ -194,8 +206,8 @@ size_t
 my_casedn_mb_varlen(const CHARSET_INFO *cs, char *src, size_t srclen,
                     char *dst, size_t dstlen)
 {
-  DBUG_ASSERT(dstlen >= srclen * cs->casedn_multiply); 
-  DBUG_ASSERT(src != dst || cs->casedn_multiply == 1);
+  assert(dstlen >= srclen * cs->casedn_multiply); 
+  assert(src != dst || cs->casedn_multiply == 1);
   return my_casefold_mb_varlen(cs, src, srclen, dst, dstlen, cs->to_lower, 0);
 }
 
@@ -204,8 +216,8 @@ size_t
 my_caseup_mb_varlen(const CHARSET_INFO *cs, char *src, size_t srclen,
                     char *dst, size_t dstlen)
 {
-  DBUG_ASSERT(dstlen >= srclen * cs->caseup_multiply);
-  DBUG_ASSERT(src != dst || cs->caseup_multiply == 1);
+  assert(dstlen >= srclen * cs->caseup_multiply);
+  assert(src != dst || cs->caseup_multiply == 1);
   return my_casefold_mb_varlen(cs, src, srclen, dst, dstlen, cs->to_upper, 1);
 }
 
@@ -233,7 +245,7 @@ int my_strcasecmp_mb(const CHARSET_INFO *cs,const char *s, const char *t)
       return 1;
   }
   /* At least one of '*s' and '*t' is zero here. */
-  DBUG_ASSERT(!*t || !*s);
+  assert(!*t || !*s);
   return (*t != *s);
 }
 
@@ -605,7 +617,7 @@ my_strnxfrm_mb(const CHARSET_INFO *cs,
   const uchar *se= src + srclen;
   const uchar *sort_order= cs->sort_order;
 
-  DBUG_ASSERT(cs->mbmaxlen <= 4);
+  assert(cs->mbmaxlen <= 4);
 
   /*
     If "srclen" is smaller than both "dstlen" and "nweights"
@@ -735,7 +747,7 @@ static void pad_max_char(const CHARSET_INFO *cs, char *str, char *end)
     else
     {
       /* Currently, it's only for GB18030, so it must be a 4-byte char */
-      DBUG_ASSERT(cs->max_sort_char > 0xFFFFFF);
+      assert(cs->max_sort_char > 0xFFFFFF);
       buf[0]= cs->max_sort_char >> 24 & 0xFF;
       buf[1]= cs->max_sort_char >> 16 & 0xFF;
       buf[2]= cs->max_sort_char >> 8 & 0xFF;
@@ -749,7 +761,7 @@ static void pad_max_char(const CHARSET_INFO *cs, char *str, char *end)
                             (uchar*) buf + sizeof(buf));
   }
   
-  DBUG_ASSERT(buflen > 0);
+  assert(buflen > 0);
   do
   {
     if ((str + buflen) <= end)

@@ -1,14 +1,20 @@
-# Copyright (c) 2005, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2005, 2023, Oracle and/or its affiliates.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU Library General Public
-# License as published by the Free Software Foundation; version 2
-# of the License.
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2.0,
+# as published by the Free Software Foundation.
+#
+# This program is also distributed with certain software (including
+# but not limited to OpenSSL) that is licensed under separate terms,
+# as designated in a particular file or component or in included license
+# documentation.  The authors of MySQL hereby grant you an additional
+# permission to link the program and your derivative works with the
+# separately licensed software that they have included with MySQL.
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# Library General Public License for more details.
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License, version 2.0, for more details.
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
@@ -1182,6 +1188,109 @@
 }
 
 {
+   OpenSSL leak 1 static SSL
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:CRYPTO_malloc
+   ...
+   fun:pthread_once
+}
+
+{
+   OpenSSL leak 2 static SSL
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:realloc
+   fun:CRYPTO_realloc
+   ...
+   fun:pthread_once
+}
+
+{
+   OpenSSL leak 1 static SSL pthread_once_slow
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:CRYPTO_malloc
+   ...
+   fun:__pthread_once_slow
+}
+
+{
+   OpenSSL leak 2 static SSL pthread_once_slow
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:realloc
+   fun:CRYPTO_realloc
+   ...
+   fun:__pthread_once_slow
+}
+
+{
+   OpenSSL leak 3 static SSL
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:CRYPTO_malloc
+   ...
+   fun:RAND_priv_bytes
+}
+
+{
+   OpenSSL leak 4 static SSL
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:CRYPTO_malloc
+   ...
+   fun:RAND_bytes
+}
+
+# http://www.openldap.org/its/index.cgi/Software%20Bugs?id=9081;page=23
+# Memory leak in ldap_initialize/ldap_unbind
+# Version: 2.4.48
+# Fixed in RE24 (2.4.49)
+{
+   OpenLDAP bug 9081
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:calloc
+   fun:ber_memcalloc_x
+   fun:ber_memcalloc
+   fun:ber_sockbuf_alloc
+   fun:ldap_create
+   fun:ldap_initialize
+}
+
+{
+   cyrus libsasl2 still reachable one
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   ...
+   fun:sasl_client_init
+}
+
+{
+   cyrus libsasl2 still reachable two
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   ...
+   fun:sasl_client_init
+}
+
+{
+   cyrus libsasl2 still reachable three
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   ...
+   fun:sasl_set_path
+}
+
+{
   OpenSSL still reachable.
   Memcheck:Leak
   match-leak-kinds: reachable
@@ -1206,6 +1315,153 @@
   ...
   fun:server_mpvio_read_packet
   ...
+}
+
+{
+  OpenSSL 3.0
+  Memcheck:Leak
+  match-leak-kinds: reachable
+  ...
+  fun:evp_generic_fetch
+  ...
+}
+
+{
+   OpenSSL 3.0
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:EVP_KEYMGMT_do_all_provided
+   ...
+}
+
+{
+   OpenSSL 3.0
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:OSSL_DECODER_CTX_new_for_pkey
+   ...
+}
+
+{
+   OpenSSL 3.0
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:OSSL_DECODER_do_all_provided
+   ...
+}
+
+{
+   OpenSSL 3.0
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:OSSL_DECODER_CTX_new_for_pkey
+   ...
+}
+
+{
+   OpenSSL 3.0
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:RAND_bytes_ex
+   ...
+}
+
+{
+   OpenSSL 3.0
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:RAND_priv_bytes_ex
+   ...
+}
+
+{
+   OpenSSL 3.0 (strange ERR_set_debug is documented to not call strdup)
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:CRYPTO_malloc
+   fun:CRYPTO_strdup
+   fun:ERR_set_debug
+   ...
+}
+
+{
+   OpenSSL 3.0
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:CRYPTO_malloc
+   fun:ERR_add_error_vdata
+   ...
+}
+
+{
+   OpenSSL 3.0
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:cache_objects
+   ...
+}
+
+{
+   OpenSSL 3.0
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:inner_loader_fetch
+   ...
+}
+
+{
+   OpenSSL 3.0
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:CRYPTO_THREAD_run_once
+   ...
+}
+
+{
+   OpenSSL 3.0
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:ossl_provider_doall_activated
+   ...
+}
+
+{
+   OpenSSL 3.0
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:_ZL8init_sslv
+   ...
+}
+
+{
+   OpenSSL 3.0
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:ssl_load_ciphers
+   ...
+}
+
+{
+   OpenSSL 3.0
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:RAND_get0_private
+   ...
 }
 
 #
@@ -1609,6 +1865,28 @@
   ...
 }
 
+{
+   TPL leak 22
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:CRYPTO_malloc
+   fun:lh_new
+   fun:int_thread_get
+   fun:int_thread_set_item
+   fun:ERR_get_state
+   fun:ERR_clear_error
+   obj:*
+   obj:*
+   obj:*
+   obj:*
+   obj:*
+   obj:*
+   obj:*
+   fun:_ZL17plugin_initializeP13st_plugin_int
+   ...
+}
+
 # Bug #25964438  LDAP: ASAN AND VALGRIND ISSUES
 {
    LDAP_TLS_workaround1
@@ -1751,4 +2029,41 @@
    ...
    fun:ldap_int_tls_start
    fun:ldap_start_tls_s
+}
+
+{
+  AWS_SDK_1_9_s2n_init
+    Memcheck:Leak
+    match-leak-kinds: reachable,definite,indirect,possible
+    ...
+    fun:s2n_init
+    ...
+}
+{
+  AWS_SDK_1_9 AWS:Init call too deep in stack
+    Memcheck:Leak
+    match-leak-kinds: indirect
+    fun:realloc
+    fun:CRYPTO_realloc
+    ...
+    fun:asn1_template_ex_d2i
+    ...
+}
+{
+  AWS_SDK_1_9_curl_init
+    Memcheck:Leak
+    match-leak-kinds: reachable
+    ...
+    fun:curl_global_init
+    ...
+    fun:_ZN3Aws7InitAPIERKNS_10SDKOptionsE
+}
+{
+  AWS_SDK_1_9_conf_modules_load
+    Memcheck:Leak
+    match-leak-kinds: reachable
+    ...
+    fun:CONF_modules_load_file
+    fun:_ZL12keyring_initPv
+    ...
 }

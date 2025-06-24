@@ -1,13 +1,20 @@
-/* Copyright (c) 2011, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2011, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -328,7 +335,7 @@ Item_func* OptRangeTest::create_item(Item_func::Functype type,
     break;
   default:
     result= NULL;
-    DBUG_ASSERT(false);
+    assert(false);
     return result;
   }
   Item *itm= static_cast<Item*>(result);
@@ -1942,7 +1949,7 @@ TEST_F(OptRangeTest, IncrementUseCount2)
 TEST_F(OptRangeTest, CombineAlways)
 {
   // Gets decremented in key_or() before being compared > 0, triggering
-  // a DBUG_ASSERT in SEL_ARG::SEL_ARG(Type) unless the ALWAYS type is
+  // a assert in SEL_ARG::SEL_ARG(Type) unless the ALWAYS type is
   // handled.
   static const int INITIAL_USE_COUNT= 3;
 
@@ -1990,7 +1997,7 @@ TEST_F(OptRangeTest, CombineAlways2)
       next_key_part= NULL;
       make_root();
       // Gets decremented in key_or() before being compared > 0, triggering
-      // a DBUG_ASSERT in SEL_ARG::SEL_ARG(Type) unless the ALWAYS type is
+      // a assert in SEL_ARG::SEL_ARG(Type) unless the ALWAYS type is
       // handled.
       use_count= 3;
     }
@@ -2057,6 +2064,25 @@ TEST_F(OptRangeTest, AppendRange)
   uchar value= 42;
   append_range(&out, &kp, &value, &value, NEAR_MIN | NEAR_MAX);
   EXPECT_STREQ("42 < my_field < 42", out.c_ptr());
+}
+
+TEST_F(OptRangeTest, CloneSpatialKey) {
+  Fake_RANGE_OPT_PARAM param(thd(), &m_alloc, 2, false);
+  Mock_SEL_ARG key1(SEL_ARG::KEY_RANGE, 2, 0);
+  Mock_SEL_ARG key2(SEL_ARG::MAYBE_KEY, 1, 0);
+  // dummy field
+  Mock_field_long field1("geom1");
+  key1.field = &field1;
+  key1.left = &null_element;
+  key1.next_key_part = NULL;
+  key1.min_flag |= GEOM_FLAG;
+  key1.rkey_func_flag = HA_READ_MBR_CONTAIN;
+  // check if tree is cloned along with gis flag.
+  SEL_ARG *cloned_key1 = key_and(&param, &key1, &key2, CLONE_KEY2_MAYBE);
+  EXPECT_NE(cloned_key1, &key1);
+  EXPECT_EQ(cloned_key1->rkey_func_flag, key1.rkey_func_flag);
+  key1.use_count = 0;
+  key2.use_count = 0;
 }
 
 }

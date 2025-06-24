@@ -1,13 +1,20 @@
-/* Copyright (c) 2014, 2015,  Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -136,11 +143,12 @@ mecab_parser_plugin_init(void*)
 		delete mecab_tagger;
 		mecab_tagger = NULL;
 
+		sql_print_error("Mecab: Unsupported dictionary charset %s",
+				mecab_dict->charset);
+
 		delete mecab_model;
 		mecab_model = NULL;
 
-		sql_print_error("Mecab: Unsupported dictionary charset %s",
-				mecab_dict->charset);
 		return(1);
 	} else {
 		sql_print_information("Mecab: Loaded dictionary charset is %s",
@@ -237,7 +245,7 @@ mecab_parse(
 		bool_info->type = FT_TOKEN_RIGHT_PAREN;
 		ret = param->mysql_add_word(param, NULL, 0, bool_info);
 
-		DBUG_ASSERT(bool_info->quot == NULL);
+		assert(bool_info->quot == NULL);
 		bool_info->type = FT_TOKEN_WORD;
 	}
 
@@ -282,7 +290,7 @@ mecab_parser_parse(
 		return(1);
 	}
 
-	DBUG_ASSERT(param->cs->mbminlen == 1);
+	assert(param->cs->mbminlen == 1);
 
 	/* Create mecab lattice for parsing */
 	mecab_lattice = mecab_model->createLattice();
@@ -294,7 +302,7 @@ mecab_parser_parse(
 
 	/* Allocate a new string with '\0' in the end to avoid
 	valgrind error "Invalid read of size 1" in mecab. */
-	DBUG_ASSERT(param->length >= 0);
+	assert(param->length >= 0);
 	int	doc_length = param->length;
 	char*	doc = reinterpret_cast<char*>(malloc(doc_length + 1));
 

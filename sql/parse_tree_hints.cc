@@ -1,13 +1,20 @@
-/* Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -222,7 +229,7 @@ bool PT_qb_level_hint::contextualize(Parse_context *pc)
       qb->subquery_hint= this;
     break;
   default:
-      DBUG_ASSERT(0);
+    assert(0);
   }
 
   if (conflict ||
@@ -273,11 +280,11 @@ void PT_qb_level_hint::append_args(THD *thd, String *str) const
       str->append(STRING_WITH_LEN(" INTOEXISTS"));
       break;
     default:      // Exactly one of above strategies should always be specified
-      DBUG_ASSERT(false);
+      assert(false);
     }
     break;
   default:
-    DBUG_ASSERT(false);
+    assert(false);
   }
 }
 
@@ -396,7 +403,7 @@ bool PT_hint_qb_name::contextualize(Parse_context *pc)
 
   Opt_hints_qb *qb= pc->select->opt_hints_qb;
 
-  DBUG_ASSERT(qb);
+  assert(qb);
 
   if (qb->get_name() ||                         // QB name is already set
       qb->get_parent()->find_by_name(&qb_name,  // Name is already used

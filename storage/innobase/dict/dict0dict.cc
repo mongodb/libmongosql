@@ -1,15 +1,23 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2023, Oracle and/or its affiliates.
 Copyright (c) 2012, Facebook Inc.
 
-This program is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation; version 2 of the License.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License, version 2.0,
+as published by the Free Software Foundation.
 
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is also distributed with certain software (including
+but not limited to OpenSSL) that is licensed under separate terms,
+as designated in a particular file or component or in included license
+documentation.  The authors of MySQL hereby grant you an additional
+permission to link the program and your derivative works with the
+separately licensed software that they have included with MySQL.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License, version 2.0, for more details.
 
 You should have received a copy of the GNU General Public License along with
 this program; if not, write to the Free Software Foundation, Inc.,
@@ -84,6 +92,9 @@ ib_warn_row_too_big(const dict_table_t*	table);
 #include "sync0sync.h"
 #include "trx0undo.h"
 #include "ut0new.h"
+#ifdef UNIV_DEBUG
+#include "trx0purge.h"
+#endif /* !UNIV_DEBUG */
 
 #include <vector>
 #include <algorithm>
@@ -913,6 +924,43 @@ dict_table_autoinc_unlock(
 	dict_table_t*	table)	/*!< in/out: table */
 {
 	mutex_exit(table->autoinc_mutex);
+}
+
+/** Create and initialize the analyze index lock for a given table.
+This lock is used to serialize two concurrent analyze index operations
+@param[in]	table_void	table whose analyze_index latch to create */
+static
+void
+dict_table_analyze_index_alloc(
+	void*	table_void)
+{
+	dict_table_t*	table = static_cast<dict_table_t*>(table_void);
+	table->analyze_index_mutex = UT_NEW_NOKEY(AnalyzeIndexMutex());
+	ut_a(table->analyze_index_mutex != NULL);
+	mutex_create(LATCH_ID_ANALYZE_INDEX_MUTEX, table->analyze_index_mutex);
+}
+
+/** Acquire the analyze index lock.
+@param[in]	table table whose analyze_index latch to lock */
+void
+dict_table_analyze_index_lock(
+	dict_table_t*	table)
+{
+	os_once::do_or_wait_for_done(
+		&table->analyze_index_mutex_created,
+		dict_table_analyze_index_alloc, table);
+
+	mutex_enter(table->analyze_index_mutex);
+}
+
+/** Release the analyze index lock.
+@param[in]	table table whose analyze_index latch to unlock */
+void
+dict_table_analyze_index_unlock(
+	dict_table_t*	table)
+{
+	ut_a(table->analyze_index_mutex != NULL);
+	mutex_exit(table->analyze_index_mutex);
 }
 #endif /* !UNIV_HOTBACKUP */
 
@@ -3546,23 +3594,6 @@ dict_index_build_internal_fts(
 	return(new_index);
 }
 /*====================== FOREIGN KEY PROCESSING ========================*/
-
-/** Check whether the dict_table_t is a partition.
-A partitioned table on the SQL level is composed of InnoDB tables,
-where each InnoDB table is a [sub]partition including its secondary indexes
-which belongs to the partition.
-@param[in]	table	Table to check.
-@return true if the dict_table_t is a partition else false. */
-UNIV_INLINE
-bool
-dict_table_is_partition(
-	const dict_table_t*	table)
-{
-	/* Check both P and p on all platforms in case it was moved to/from
-	WIN. */
-	return(strstr(table->name.m_name, "#p#")
-	       || strstr(table->name.m_name, "#P#"));
-}
 
 /*********************************************************************//**
 Checks if a table is referenced by foreign keys.
@@ -6728,6 +6759,11 @@ dict_foreign_qualify_index(
 		return(false);
 	}
 
+	if (index->type & DICT_SPATIAL) {
+		/* Spatial index cannot be used as foreign keys */
+		return(false);
+	}
+
 	for (ulint i = 0; i < n_cols; i++) {
 		dict_field_t*	field;
 		const char*	col_name;
@@ -7133,3 +7169,39 @@ dict_table_extent_size(
 
 	return(pages_in_extent);
 }
+
+/** @return number of base columns of virtual column in foreign key column
+@param[in]      vcol    in-memory virtual column
+@param[in]      foreign in-memory Foreign key constraint */
+uint32_t dict_vcol_base_is_foreign_key(dict_v_col_t *vcol,
+                                   dict_foreign_t *foreign) {
+
+	const dict_table_t *table = foreign->foreign_table;
+	uint32_t foreign_col_count = 0;
+
+	for (uint32_t i = 0; i < foreign->n_fields; i++) {
+		const char *foreign_col_name = foreign->foreign_col_names[i];
+		for (uint32_t j = 0; j < vcol->num_base; j++) {
+			if (innobase_strcasecmp(foreign_col_name,
+			    dict_table_get_col_name(table,
+			    vcol->base_col[j]->ind)) == 0) {
+				foreign_col_count++;
+			}
+		}
+	}
+	return foreign_col_count;
+}
+
+#ifndef UNIV_HOTBACKUP
+#ifdef UNIV_DEBUG
+/** Validate no active background threads to cause purge or rollback
+operations. */
+void
+dict_validate_no_purge_rollback_threads() {
+	/* No concurrent background threads to access to the table */
+	ut_ad(trx_purge_state() == PURGE_STATE_STOP
+	      || trx_purge_state() == PURGE_STATE_DISABLED);
+	ut_ad(!trx_rollback_or_clean_is_active);
+}
+#endif /* UNIV_DEBUG */
+#endif /* !UNIV_HOTBACKUP */

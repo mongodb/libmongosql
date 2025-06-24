@@ -1,12 +1,19 @@
-/* Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -42,7 +49,7 @@
 #define DEBUG_SE_WRITE_ERROR_POST(debug_flag)    \
   DBUG_EXECUTE_IF(debug_flag,  \
                   {  \
-                    DBUG_ASSERT(error == HA_ERR_INTERNAL_ERROR);  \
+                    assert(error == HA_ERR_INTERNAL_ERROR);    \
                     DBUG_SET("-d, inject_error_ha_write_row"); \
                     error= HA_ERR_LOCK_WAIT_TIMEOUT;  \
                   });
@@ -54,7 +61,7 @@
 #define DEBUG_SE_UPDATE_ERROR_POST(debug_flag)    \
   DBUG_EXECUTE_IF(debug_flag,  \
                   {  \
-                    DBUG_ASSERT(error == HA_ERR_INTERNAL_ERROR);  \
+                    assert(error == HA_ERR_INTERNAL_ERROR);     \
                     DBUG_SET("-d, inject_error_ha_update_row"); \
                     error= HA_ERR_LOCK_WAIT_TIMEOUT;  \
                   });
@@ -66,7 +73,7 @@
 #define DEBUG_SE_DELETE_ERROR_POST(debug_flag)    \
   DBUG_EXECUTE_IF(debug_flag,  \
                   {  \
-                    DBUG_ASSERT(error == HA_ERR_INTERNAL_ERROR);  \
+                    assert(error == HA_ERR_INTERNAL_ERROR);     \
                     DBUG_SET("-d, inject_error_ha_delete_row"); \
                     error= HA_ERR_LOCK_WAIT_TIMEOUT;  \
                   });
@@ -671,11 +678,11 @@ void close_acl_tables(THD *thd)
   }
   else
   {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     bool res=
 #endif
       trans_commit_stmt(thd);
-    DBUG_ASSERT(res == false);
+    assert(res == false);
   }
 
   close_mysql_tables(thd);
@@ -712,7 +719,7 @@ bool acl_end_trans_and_close_tables(THD *thd, bool rollback_transaction)
     It is safe to do so since ACL statement always do implicit commit at the
     end of statement.
   */
-  DBUG_ASSERT(stmt_causes_implicit_commit(thd, CF_IMPLICIT_COMMIT_END));
+  assert(stmt_causes_implicit_commit(thd, CF_IMPLICIT_COMMIT_END));
 
   if (rollback_transaction)
   {
@@ -900,7 +907,7 @@ int replace_user_table(THD *thd, TABLE *table, LEX_USER *combo,
     goto end;
   
   table->use_all_columns();
-  DBUG_ASSERT(combo->host.str != NULL);
+  assert(combo->host.str != NULL);
   table->field[MYSQL_USER_FIELD_HOST]->store(combo->host.str,combo->host.length,
                                              system_charset_info);
   table->field[MYSQL_USER_FIELD_USER]->store(combo->user.str,combo->user.length,
@@ -939,9 +946,19 @@ int replace_user_table(THD *thd, TABLE *table, LEX_USER *combo,
     optimize_plugin_compare_by_pointer(&combo->plugin);
     builtin_plugin= auth_plugin_is_built_in(combo->plugin.str);
 
+    /* The user record was neither present nor the intention was to create it */
     if (!can_create_user)
     {
-      my_error(ER_CANT_CREATE_USER_WITH_GRANT, MYF(0));
+      if(thd->lex->sql_command == SQLCOM_GRANT)
+      {
+        /* Have come here to GRANT privilege to the non-existing user */
+        my_error(ER_CANT_CREATE_USER_WITH_GRANT, MYF(0));
+      }
+      else if (update_password)
+      {
+        /* Have come here to update the password of the non-existing user */
+        my_error(ER_PASSWORD_NO_MATCH, MYF(0), combo->user.str, combo->host.str);
+      }
       error= 1;
       goto end;
     }
@@ -966,7 +983,7 @@ int replace_user_table(THD *thd, TABLE *table, LEX_USER *combo,
     }
     old_row_exists = 0;
     restore_record(table,s->default_values);
-    DBUG_ASSERT(combo->host.str != NULL);
+    assert(combo->host.str != NULL);
     table->field[MYSQL_USER_FIELD_HOST]->store(combo->host.str,combo->host.length,
                                                system_charset_info);
     table->field[MYSQL_USER_FIELD_USER]->store(combo->user.str,combo->user.length,

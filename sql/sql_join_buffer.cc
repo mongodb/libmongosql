@@ -1,13 +1,20 @@
-/* Copyright (c) 2010, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -508,7 +515,7 @@ bool JOIN_CACHE::alloc_buffer()
 static void filter_gcol_for_dynamic_range_scan(QEP_TAB *const tab)
 {
   TABLE *table= tab->table();
-  DBUG_ASSERT(tab->dynamic_range() && table->vfield);
+  assert(tab->dynamic_range() && table->vfield);
 
   for (uint key= 0; key < table->s->keys; ++key)
   {
@@ -559,6 +566,7 @@ static void filter_gcol_for_dynamic_range_scan(QEP_TAB *const tab)
 
 void JOIN_CACHE::filter_virtual_gcol_base_cols()
 {
+  assert(save_read_set_for_gcol.size() == 0);
   for (QEP_TAB *tab= qep_tab - tables; tab < qep_tab; tab++)
   {
     TABLE *table= tab->table();
@@ -566,8 +574,8 @@ void JOIN_CACHE::filter_virtual_gcol_base_cols()
       continue;
 
     const uint index= tab->effective_index();
-    if (index != MAX_KEY &&
-        table->index_contains_some_virtual_gcol(index) &&
+    const bool cov_index =
+      index != MAX_KEY && table->index_contains_some_virtual_gcol(index) &&
         /*
           There are two cases:
           - If the table scan uses covering index scan, we can get the value
@@ -577,24 +585,40 @@ void JOIN_CACHE::filter_virtual_gcol_base_cols()
             After restore the base columns, the value of virtual generated
             columns can be calculated correctly.
         */
-        table->covering_keys.is_set(index))
+        table->covering_keys.is_set(index);
+
+    if (!(cov_index || tab->dynamic_range())) continue;
+
+    /*
+      Save of a copy of table->read_set in save_read_set so that it can be
+      restored. tmp_set cannot be used as recipient for this as it's already
+      used in other parts of JOIN_CACHE::init().
+    */
+    my_bitmap_map *bitbuf =
+      (my_bitmap_map *)alloc_root(tab->table()->in_use->mem_root,
+                                  table->s->column_bitmap_size);
+    MY_BITMAP *save_read_set =
+      (MY_BITMAP *)alloc_root(tab->table()->in_use->mem_root,
+                              sizeof(MY_BITMAP));
+    bitmap_init(save_read_set, bitbuf, table->s->fields, false);
+    bitmap_copy(save_read_set, table->read_set);
+    /*
+      restore_virtual_gcol_base_cols() will need old bitmap so we save a
+      reference to it.
+    */
+    save_read_set_for_gcol.push_back(save_read_set);
+
+    if (cov_index)
     {
-      DBUG_ASSERT(bitmap_is_clear_all(&table->tmp_set));
-      // Keep table->read_set in tmp_set so that it can be restored
-      bitmap_copy(&table->tmp_set, table->read_set);
       bitmap_clear_all(table->read_set);
       table->mark_columns_used_by_index_no_reset(index, table->read_set);
       if (table->s->primary_key != MAX_KEY)
         table->mark_columns_used_by_index_no_reset(table->s->primary_key,
                                                    table->read_set);
-      bitmap_intersect(table->read_set, &table->tmp_set);
+      bitmap_intersect(table->read_set, save_read_set);
     }
     else if (tab->dynamic_range())
     {
-      DBUG_ASSERT(bitmap_is_clear_all(&table->tmp_set));
-      // Keep table->read_set in tmp_set so that it can be restored
-      bitmap_copy(&table->tmp_set, table->read_set);
-
       filter_gcol_for_dynamic_range_scan(tab);
     }
   }
@@ -608,18 +632,25 @@ void JOIN_CACHE::filter_virtual_gcol_base_cols()
 
 void JOIN_CACHE::restore_virtual_gcol_base_cols()
 {
+  MY_BITMAP **save_read_set= save_read_set_for_gcol.begin();
+
   for (QEP_TAB *tab= qep_tab - tables; tab < qep_tab; tab++)
   {
     TABLE *table= tab->table();
     if (table->vfield == NULL)
       continue;
 
-    if (!bitmap_is_clear_all(&table->tmp_set))
-    {
-      bitmap_copy(table->read_set, &table->tmp_set);
-      bitmap_clear_all(&table->tmp_set);
-    }
+    const uint index= tab->effective_index();
+    const bool cov_index =
+      (index != MAX_KEY && table->index_contains_some_virtual_gcol(index) &&
+       table->covering_keys.is_set(index));
+
+    if (!(cov_index || tab->dynamic_range())) continue;
+
+    bitmap_copy(table->read_set, *save_read_set);
+    save_read_set++;
   }
+  assert(save_read_set == save_read_set_for_gcol.end());
 }
 
 /* 
@@ -1072,7 +1103,7 @@ uint JOIN_CACHE_BKA::aux_buffer_min_size() const
     For DS-MRR to work, the sort buffer must have space to store the
     reference (or primary key) for at least one record.
   */
-  DBUG_ASSERT(qep_tab->table()->file->stats.mrr_length_per_rec > 0);
+  assert(qep_tab->table()->file->stats.mrr_length_per_rec > 0);
   return qep_tab->table()->file->stats.mrr_length_per_rec;
 }
 
@@ -1559,7 +1590,7 @@ bool JOIN_CACHE::get_match_flag_by_pos(uchar *rec_ptr)
     uchar *prev_rec_ptr= prev_cache->get_rec_ref(rec_ptr);
     return prev_cache->get_match_flag_by_pos(prev_rec_ptr);
   } 
-  DBUG_ASSERT(1);
+  assert(1);
   return FALSE;
 }
 
@@ -1791,7 +1822,7 @@ bool JOIN_CACHE::read_referenced_field(CACHE_FIELD *copy,
 
 bool JOIN_CACHE::skip_record_if_match()
 {
-  DBUG_ASSERT(with_match_flag && with_length);
+  assert(with_match_flag && with_length);
   uint offset= size_of_rec_len;
   if (prev_cache)
     offset+= prev_cache->get_size_of_rec_offset();
@@ -1884,7 +1915,7 @@ enum_nested_loop_state JOIN_CACHE::join_records(bool skip_last)
     TABLE_LIST * const tr= qep_tab[- cnt].table_ref;
     const uint8 status= tr->table->status;
     const table_map map= tr->map();
-    DBUG_ASSERT((status & (STATUS_DELETED | STATUS_UPDATED)) == 0);
+    assert((status & (STATUS_DELETED | STATUS_UPDATED)) == 0);
     if (status & STATUS_GARBAGE)
       saved_status_bits[0]|= map;
     if (status & STATUS_NOT_FOUND)
@@ -1968,7 +1999,7 @@ enum_nested_loop_state JOIN_CACHE::join_records(bool skip_last)
 
   if (skip_last)
   {
-    DBUG_ASSERT(!is_key_access());
+    assert(!is_key_access());
     /*
        Restore the last record from the join buffer to generate
        all extensions for it.
@@ -2059,7 +2090,7 @@ enum_nested_loop_state JOIN_CACHE_BNL::join_matching_records(bool skip_last)
     put_record_in_cache();     
 
   // See setup_join_buffering(=: dynamic range => no cache.
-  DBUG_ASSERT(!(qep_tab->dynamic_range() && qep_tab->quick()));
+  assert(!(qep_tab->dynamic_range() && qep_tab->quick()));
 
   /* Start retrieving all records of the joined table */
   if ((error= (*qep_tab->read_first_record)(qep_tab)))
@@ -2180,7 +2211,7 @@ bool JOIN_CACHE::set_match_flag_if_none(QEP_TAB *first_inner,
   while (cache->qep_tab != first_inner)
   {
     cache= cache->prev_cache;
-    DBUG_ASSERT(cache);
+    assert(cache);
     rec_ptr= cache->get_rec_ref(rec_ptr);
   } 
   if (rec_ptr[0] == 0)
@@ -2362,7 +2393,7 @@ enum_nested_loop_state JOIN_CACHE::join_null_complements(bool skip_last)
   cnt= records - (is_key_access() ? 0 : MY_TEST(skip_last));
 
   /* This function may be called only for inner tables of outer joins */ 
-  DBUG_ASSERT(qep_tab->first_inner() != NO_PLAN_IDX);
+  assert(qep_tab->first_inner() != NO_PLAN_IDX);
 
   // Make sure that the rowid buffer is bound, duplicates weedout needs it
   if (qep_tab->copy_current_rowid &&
@@ -2558,7 +2589,7 @@ bool bka_range_seq_skip_record(range_seq_t rseq, char *range_info, uchar *rowid)
 enum_nested_loop_state JOIN_CACHE_BKA::join_matching_records(bool skip_last)
 {
   /* The value of skip_last must be always FALSE when this function is called */
-  DBUG_ASSERT(!skip_last);
+  assert(!skip_last);
 
   /* Return at once if there are no records in the join buffer */
   if (!records)
@@ -2647,7 +2678,7 @@ JOIN_CACHE_BKA::init_join_matching_records(RANGE_SEQ_IF *seq_funcs, uint ranges)
   qep_tab->table()->reset_null_row();
 
   /* Dynamic range access is never used with BKA */
-  DBUG_ASSERT(!qep_tab->dynamic_range());
+  assert(!qep_tab->dynamic_range());
 
   init_mrr_buff();
 
@@ -2735,7 +2766,7 @@ uint JOIN_CACHE_BKA::get_next_key(uchar ** key)
     return 0;
 
   /* Any record in a BKA cache is prepended with its length, which we need */
-  DBUG_ASSERT(with_length);
+  assert(with_length);
 
   /*
     Read keys until find non-ignorable one or EOF.
@@ -2771,7 +2802,7 @@ uint JOIN_CACHE_BKA::get_next_key(uchar ** key)
       /* An embedded key is taken directly from the join buffer */
       *key= pos;
       len= emb_key_length;
-      DBUG_ASSERT(len != 0);
+      assert(len != 0);
     }
     else
     {
@@ -2787,12 +2818,12 @@ uint JOIN_CACHE_BKA::get_next_key(uchar ** key)
         for (cache= prev_cache; key_arg_count; cache= cache->prev_cache)
         {
           uint len2= 0;
-          DBUG_ASSERT(cache);
+          assert(cache);
           rec_ptr= cache->get_rec_ref(rec_ptr);
           while (!cache->referenced_fields)
           {
             cache= cache->prev_cache;
-            DBUG_ASSERT(cache);
+            assert(cache);
             rec_ptr= cache->get_rec_ref(rec_ptr);
           }
           while (key_arg_count && 
@@ -2828,7 +2859,7 @@ uint JOIN_CACHE_BKA::get_next_key(uchar ** key)
         cp_buffer_from_ref(join->thd, qep_tab->table(), ref);
         *key= ref->key_buff;
         len= ref->key_length;
-        DBUG_ASSERT(len != 0);
+        assert(len != 0);
       }
     }
   }
@@ -3460,7 +3491,7 @@ enum_nested_loop_state
 JOIN_CACHE_BKA_UNIQUE::join_matching_records(bool skip_last)
 {
   /* The value of skip_last must be always FALSE when this function is called */
-  DBUG_ASSERT(!skip_last);
+  assert(!skip_last);
 
   /* Return at once if there are no records in the join buffer */
   if (!records)
@@ -3603,7 +3634,7 @@ uint JOIN_CACHE_BKA_UNIQUE::get_next_key(uchar ** key)
 
   *key = use_emb_key ? get_emb_key(curr_key_entry) : curr_key_entry;
 
-  DBUG_ASSERT(*key >= buff && *key < hash_table);
+  assert(*key >= buff && *key < hash_table);
 
   return key_length;
 }

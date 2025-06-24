@@ -2,22 +2,29 @@
 #define OPT_COSTCONSTANTS_INCLUDED
 
 /*
-   Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
    51 Franklin Street, Suite 500, Boston, MA 02110-1335 USA */
 
-#include "my_dbug.h"                            // DBUG_ASSERT
+#include "my_dbug.h"                            // assert
 #include "handler.h"                            // MAX_HA
 #include "m_string.h"                           // LEX_CSTRING
 
@@ -362,9 +369,9 @@ protected:
   void set_cost_constants(SE_cost_constants *cost_constants,
                           unsigned int storage_class)
   {
-    DBUG_ASSERT(cost_constants != NULL);
-    DBUG_ASSERT(storage_class < MAX_STORAGE_CLASSES);
-    DBUG_ASSERT(m_se_cost_constants[storage_class] == NULL);
+    assert(cost_constants != NULL);
+    assert(storage_class < MAX_STORAGE_CLASSES);
+    assert(m_se_cost_constants[storage_class] == NULL);
 
     m_se_cost_constants[storage_class]= cost_constants;
   }
@@ -380,8 +387,8 @@ protected:
 
   const SE_cost_constants *get_cost_constants(unsigned int storage_class) const
   {
-    DBUG_ASSERT(storage_class < MAX_STORAGE_CLASSES);
-    DBUG_ASSERT(m_se_cost_constants[storage_class] != NULL);
+    assert(storage_class < MAX_STORAGE_CLASSES);
+    assert(m_se_cost_constants[storage_class] != NULL);
 
     return m_se_cost_constants[storage_class];
   }
@@ -396,8 +403,8 @@ protected:
 
   SE_cost_constants *get_cost_constants(unsigned int storage_class)
   {
-    DBUG_ASSERT(storage_class < MAX_STORAGE_CLASSES);
-    DBUG_ASSERT(m_se_cost_constants[storage_class] != NULL);
+    assert(storage_class < MAX_STORAGE_CLASSES);
+    assert(m_se_cost_constants[storage_class] != NULL);
 
     return m_se_cost_constants[storage_class];
   }
@@ -509,7 +516,7 @@ protected:
 
   unsigned int dec_ref_count()
   {
-    DBUG_ASSERT(m_ref_counter > 0);
+    assert(m_ref_counter > 0);
 
     m_ref_counter--;
     return m_ref_counter;
@@ -556,7 +563,7 @@ private:
   /// Reference counter for this set of cost constants.
   unsigned int m_ref_counter;
 
-#if !defined(DBUG_OFF)
+#if !defined(NDEBUG)
   /// Version number for this cost constant set. Not used. Will likely remove
   unsigned int version_no;
 #endif

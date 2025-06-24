@@ -1,6 +1,6 @@
 /***********************************************************************
 
-Copyright (c) 1995, 2017, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2023, Oracle and/or its affiliates.
 Copyright (c) 2009, Percona Inc.
 
 Portions of this file contain modifications contributed and copyrighted
@@ -10,14 +10,21 @@ documentation. The contributions by Percona Inc. are incorporated with
 their permission, and subject to the conditions contained in the file
 COPYING.Percona.
 
-This program is free software; you can redistribute it and/or modify it
-under the terms of the GNU General Public License as published by the
-Free Software Foundation; version 2 of the License.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License, version 2.0,
+as published by the Free Software Foundation.
 
-This program is distributed in the hope that it will be useful, but
-WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
-Public License for more details.
+This program is also distributed with certain software (including
+but not limited to OpenSSL) that is licensed under separate terms,
+as designated in a particular file or component or in included license
+documentation.  The authors of MySQL hereby grant you an additional
+permission to link the program and your derivative works with the
+separately licensed software that they have included with MySQL.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License, version 2.0, for more details.
 
 You should have received a copy of the GNU General Public License along with
 this program; if not, write to the Free Software Foundation, Inc.,
@@ -235,11 +242,26 @@ struct Compression {
 #endif /* UNIV_DEBUG */
 	}
 
+	/** Version of compressed page */
+	static const uint8_t FIL_PAGE_VERSION_1 = 1;
+	static const uint8_t FIL_PAGE_VERSION_2 = 2;
+
 	/** Check the page header type field.
 	@param[in]	page		Page contents
 	@return true if it is a compressed page */
 	static bool is_compressed_page(const byte* page)
 		MY_ATTRIBUTE((warn_unused_result));
+
+	/** Check the page header type field.
+	@param[in]   page            Page contents
+	@return true if it is a compressed and encrypted page */
+	static bool is_compressed_encrypted_page(const byte *page)
+		MY_ATTRIBUTE((warn_unused_result));
+
+	/** Check if the version on page is valid.
+	@param[in]   version         version
+	@return true if version is valid */
+	static bool is_valid_page_version(uint8_t version);
 
         /** Check wether the compression algorithm is supported.
         @param[in]      algorithm       Compression algorithm to check
@@ -510,7 +532,6 @@ struct Encryption {
 #define IORequestWrite		IORequest(IORequest::WRITE)
 #define IORequestLogRead	IORequest(IORequest::LOG | IORequest::READ)
 #define IORequestLogWrite	IORequest(IORequest::LOG | IORequest::WRITE)
-
 /**
 The IO Context that is passed down to the low level IO code */
 class IORequest {
@@ -554,7 +575,10 @@ public:
 		This can be used to force a read and write without any
 		compression e.g., for redo log, merge sort temporary files
 		and the truncate redo log. */
-		NO_COMPRESSION = 512
+		NO_COMPRESSION = 512,
+
+		/** Row log used in online DDL */
+		ROW_LOG = 1024
 	};
 
 	/** Default constructor */
@@ -578,7 +602,7 @@ public:
 		m_compression(),
 		m_encryption()
 	{
-		if (is_log()) {
+		if (is_log() || is_row_log()) {
 			disable_compression();
 		}
 
@@ -616,6 +640,13 @@ public:
 		MY_ATTRIBUTE((warn_unused_result))
 	{
 		return((m_type & LOG) == LOG);
+	}
+
+	/** @return true if it is a row log entry used in online DDL */
+	bool is_row_log() const
+		MY_ATTRIBUTE((warn_unused_result))
+	{
+		return((m_type & ROW_LOG) == ROW_LOG);
 	}
 
 	/** @return true if the simulated AIO thread should be woken up */
@@ -2042,6 +2073,11 @@ os_file_get_status(
 	bool		read_only);
 
 #if !defined(UNIV_HOTBACKUP)
+/** return one of the tmpdir path
+@return tmporary dir*/
+char *innobase_mysql_tmpdir(void);
+
+
 /** Creates a temporary file in the location specified by the parameter
 path. If the path is NULL then it will be created on --tmpdir location.
 This function is defined in ha_innodb.cc.

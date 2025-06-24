@@ -1,13 +1,20 @@
-/* Copyright (c) 2002, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2002, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -231,8 +238,8 @@ public:
   */
   const char *pop_expr_start_ptr()
   {
-#ifndef DBUG_OFF
-    DBUG_ASSERT(m_expr_start_ptr);
+#ifndef NDEBUG
+    assert(m_expr_start_ptr);
     const char *p= m_expr_start_ptr;
     m_expr_start_ptr= NULL;
     return p;
@@ -251,7 +258,7 @@ public:
   */
   void push_expr_start_ptr(const char *expr_start_ptr)
   {
-    DBUG_ASSERT(!m_expr_start_ptr);
+    assert(!m_expr_start_ptr);
     m_expr_start_ptr= expr_start_ptr;
   }
 
@@ -891,7 +898,7 @@ public:
                     HAS_COMMIT_OR_ROLLBACK|HAS_SQLCOM_RESET|HAS_SQLCOM_FLUSH));
   }
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   /**
     Return the routine instructions as a result set.
     @return Error status.

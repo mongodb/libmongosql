@@ -1,14 +1,22 @@
 /*****************************************************************************
 
-Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
-This program is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation; version 2 of the License.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License, version 2.0,
+as published by the Free Software Foundation.
 
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is also distributed with certain software (including
+but not limited to OpenSSL) that is licensed under separate terms,
+as designated in a particular file or component or in included license
+documentation.  The authors of MySQL hereby grant you an additional
+permission to link the program and your derivative works with the
+separately licensed software that they have included with MySQL.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License, version 2.0, for more details.
 
 You should have received a copy of the GNU General Public License along with
 this program; if not, write to the Free Software Foundation, Inc.,
@@ -264,11 +272,11 @@ Ha_innopart_share::open_table_parts(
 	char	partition_name[FN_REFLEN];
 	bool	index_loaded = true;
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 	if (m_table_share->tmp_table == NO_TMP_TABLE) {
 		mysql_mutex_assert_owner(&m_table_share->LOCK_ha_data);
 	}
-#endif /* DBUG_OFF */
+#endif /* NDEBUG */
 	m_ref_count++;
 	if (m_table_parts != NULL) {
 		ut_ad(m_ref_count > 1);
@@ -425,11 +433,11 @@ err:
 void
 Ha_innopart_share::close_table_parts()
 {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 	if (m_table_share->tmp_table == NO_TMP_TABLE) {
 		mysql_mutex_assert_owner(&m_table_share->LOCK_ha_data);
 	}
-#endif /* DBUG_OFF */
+#endif /* NDEBUG */
 	m_ref_count--;
 	if (m_ref_count != 0) {
 
@@ -853,7 +861,7 @@ ha_innopart::initialize_auto_increment(
 	ulonglong	auto_inc = 0;
 	const Field*	field = table->found_next_number_field;
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 	if (table_share->tmp_table == NO_TMP_TABLE)
 	{
 		mysql_mutex_assert_owner(m_part_share->auto_inc_mutex);
@@ -1041,8 +1049,6 @@ share_error:
 	m_upd_buf = NULL;
 	m_upd_buf_size = 0;
 
-	/* Get pointer to a table object in InnoDB dictionary cache. */
-	ib_table = m_part_share->get_table_part(0);
 
 	m_pcur_parts = NULL;
 	m_clust_pcur_parts = NULL;
@@ -1072,54 +1078,54 @@ share_error:
 
 	MONITOR_INC(MONITOR_TABLE_OPEN);
 
-	bool	no_tablespace;
 
-	/* TODO: Should we do this check for every partition during ::open()? */
 	/* TODO: refactor this in ha_innobase so it can increase code reuse. */
-	if (dict_table_is_discarded(ib_table)) {
+	for (uint part_id = 0; part_id < m_tot_parts; part_id++) {
+		bool	no_tablespace;
+		ib_table = m_part_share->get_table_part(part_id);
+		if (dict_table_is_discarded(ib_table)) {
 
-		ib_senderrf(thd,
-			IB_LOG_LEVEL_WARN, ER_TABLESPACE_DISCARDED,
-			table->s->table_name.str);
+			ib_senderrf(thd,
+				IB_LOG_LEVEL_WARN, ER_TABLESPACE_DISCARDED,
+				table->s->table_name.str);
 
-		/* Allow an open because a proper DISCARD should have set
-		all the flags and index root page numbers to FIL_NULL that
-		should prevent any DML from running but it should allow DDL
-		operations. */
+			/* Allow an open because a proper DISCARD should have set
+			all the flags and index root page numbers to FIL_NULL that
+			should prevent any DML from running but it should allow DDL
+			operations. */
 
-		no_tablespace = false;
+			no_tablespace = false;
 
-	} else if (ib_table->ibd_file_missing) {
+		} else if (ib_table->ibd_file_missing) {
 
-		ib_senderrf(
-			thd, IB_LOG_LEVEL_WARN,
-			ER_TABLESPACE_MISSING, norm_name);
+			ib_senderrf(
+				thd, IB_LOG_LEVEL_WARN,
+				ER_TABLESPACE_MISSING, norm_name);
 
-		/* This means we have no idea what happened to the tablespace
-		file, best to play it safe. */
+			/* This means we have no idea what happened to the tablespace
+			file, best to play it safe. */
 
-		no_tablespace = true;
-	} else {
-		no_tablespace = false;
+			no_tablespace = true;
+		} else {
+			no_tablespace = false;
+		}
+
+		if (!thd_tablespace_op(thd) && no_tablespace) {
+			set_my_errno(ENOENT);
+			close();
+			DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
+		}
 	}
 
-	if (!thd_tablespace_op(thd) && no_tablespace) {
-                set_my_errno(ENOENT);
-
-		lock_shared_ha_data();
-		m_part_share->close_table_parts();
-		unlock_shared_ha_data();
-		m_part_share = NULL;
-
-		DBUG_RETURN(HA_ERR_NO_SUCH_TABLE);
-	}
+	/* Get pointer to a table object in InnoDB dictionary cache. */
+	ib_table = m_part_share->get_table_part(0);
 
 	m_prebuilt = row_create_prebuilt(ib_table, table->s->reclength);
 
 	m_prebuilt->default_rec = table->s->default_values;
 	ut_ad(m_prebuilt->default_rec);
 
-	DBUG_ASSERT(table != NULL);
+	assert(table != NULL);
 	m_prebuilt->m_mysql_table = table;
 	m_prebuilt->m_mysql_handler = this;
 
@@ -1343,6 +1349,7 @@ share_error:
 		close();  // Frees all the above.
 		DBUG_RETURN(HA_ERR_OUT_OF_MEM);
 	}
+	m_reuse_mysql_template = false;
 	info(HA_STATUS_NO_LOCK | HA_STATUS_VARIABLE | HA_STATUS_CONST);
 
 	DBUG_RETURN(0);
@@ -1453,8 +1460,10 @@ ha_innopart::close()
 
 	/* Prevent double close of m_prebuilt->table. The real one was done
 	done in m_part_share->close_table_parts(). */
-	m_prebuilt->table = NULL;
-	row_prebuilt_free(m_prebuilt, FALSE);
+	if (m_prebuilt != NULL) {
+		m_prebuilt->table = NULL;
+		row_prebuilt_free(m_prebuilt, FALSE);
+        }
 
 	if (m_upd_buf != NULL) {
 		ut_ad(m_upd_buf_size != 0);
@@ -1574,6 +1583,7 @@ ha_innopart::update_partition(
 	m_row_read_type_parts[part_id] = m_prebuilt->row_read_type;
 	if (m_prebuilt->sql_stat_start == 0) {
 		clear_bit(m_sql_stat_start_parts, part_id);
+		m_reuse_mysql_template = true;
 	}
 	m_last_part = part_id;
 	DBUG_VOID_RETURN;
@@ -2739,6 +2749,12 @@ ha_innopart::create(
 				     tablespace_name);
 
 	DBUG_ENTER("ha_innopart::create");
+
+        if (is_shared_tablespace(create_info->tablespace)) {
+		push_deprecated_warn_no_replacement(
+			ha_thd(), PARTITION_IN_SHARED_TABLESPACE_WARNING);
+        }
+
 	ut_ad(create_info != NULL);
 	ut_ad(m_part_info == form->part_info);
 	ut_ad(table_share != NULL);
@@ -2858,6 +2874,11 @@ ha_innopart::create(
 		set_create_info_dir(part_elem, create_info);
 
 		if (!form->part_info->is_sub_partitioned()) {
+			if (is_shared_tablespace(part_elem->tablespace_name)) {
+				push_deprecated_warn_no_replacement(
+					ha_thd(), PARTITION_IN_SHARED_TABLESPACE_WARNING);
+			}
+
 			error = info.prepare_create_table(partition_name);
 			if (error != 0) {
 				goto cleanup;
@@ -2877,6 +2898,11 @@ ha_innopart::create(
 
 			while ((sub_elem = sub_it++)) {
 				ut_ad(sub_elem->partition_name != NULL);
+
+				if (is_shared_tablespace(sub_elem->tablespace_name)) {
+					push_deprecated_warn_no_replacement(
+						ha_thd(), PARTITION_IN_SHARED_TABLESPACE_WARNING);
+				}
 
 				/* 'table' will be
 				<name>#P#<part_name>#SP#<subpart_name>.
@@ -3002,13 +3028,24 @@ end:
 	DBUG_RETURN(error);
 
 cleanup:
-	trx_rollback_for_mysql(info.trx());
+    trx_rollback_for_mysql(info.trx());
 
-	row_mysql_unlock_data_dictionary(info.trx());
+    row_mysql_unlock_data_dictionary(info.trx());
 
-	trx_free_for_mysql(info.trx());
+    ulint dummy;
+    char norm_name[FN_REFLEN];
 
-	DBUG_RETURN(error);
+    normalize_table_name(norm_name, name);
+
+    uint lent = (uint)strlen(norm_name);
+    ut_a(lent < FN_REFLEN);
+    norm_name[lent] = '#';
+    norm_name[lent + 1] = 0;
+
+    row_drop_database_for_mysql(norm_name, info.trx(), &dummy);
+
+    trx_free_for_mysql(info.trx());
+    DBUG_RETURN(error);
 }
 
 /** Discards or imports an InnoDB tablespace.
@@ -3911,7 +3948,7 @@ ha_innopart::info_low(
 		ut_a(m_prebuilt->trx);
 		ut_a(m_prebuilt->trx->magic_n == TRX_MAGIC_N);
 
-		err_index = trx_get_error_info(m_prebuilt->trx);
+		err_index = trx_get_error_index(m_prebuilt->trx);
 
 		if (err_index != NULL) {
 			errkey = m_part_share->get_mysql_key(m_last_part,
@@ -4158,6 +4195,7 @@ ha_innopart::start_stmt(
 		memset(m_sql_stat_start_parts, 0,
 		       UT_BITS_IN_BYTES(m_tot_parts));
 	}
+	m_reuse_mysql_template = false;
 	return(error);
 }
 
@@ -4237,6 +4275,15 @@ ha_innopart::external_lock(
 
 				ut_ad(table->quiesce == QUIESCE_START);
 
+				if (dict_table_is_discarded(table)) {
+					ib_senderrf(m_prebuilt->trx->mysql_thd,
+						    IB_LOG_LEVEL_ERROR,
+						    ER_TABLESPACE_DISCARDED,
+						    table->name.m_name);
+
+					return (HA_ERR_NO_SUCH_TABLE);
+				}
+
 				row_quiesce_table_start(table,
 							m_prebuilt->trx);
 
@@ -4282,6 +4329,7 @@ ha_innopart::external_lock(
 		memset(m_sql_stat_start_parts, 0,
 		       UT_BITS_IN_BYTES(m_tot_parts));
 	}
+	m_reuse_mysql_template = false;
 	return(error);
 }
 
@@ -4313,6 +4361,16 @@ ha_innopart::get_auto_increment(
 		first_value,
 		nb_reserved_values);
 	DBUG_VOID_RETURN;
+}
+
+/** Get partition row type
+@param[in] Id of partition for which row type to be retrieved
+@return Partition row type */
+enum row_type ha_innopart::get_partition_row_type(
+        uint part_id)
+{
+	set_partition(part_id);
+	return get_row_type();
 }
 
 /** Compares two 'refs'.
@@ -4402,6 +4460,11 @@ ha_innopart::create_new_partition(
 			"InnoDB: DATA DIRECTORY cannot be used"
 			" with a TABLESPACE assignment.", MYF(0));
 		DBUG_RETURN(HA_WRONG_CREATE_OPTION);
+	}
+
+	if (tablespace_is_shared_space(create_info)) {
+		push_deprecated_warn_no_replacement(
+			ha_thd(), PARTITION_IN_SHARED_TABLESPACE_WARNING);
 	}
 
 	error = ha_innobase::create(norm_name, table, create_info);
@@ -4543,8 +4606,8 @@ ha_innopart::rnd_pos_by_record(uchar*  record)
 {
 	int error;
 	DBUG_ENTER("ha_innopart::rnd_pos_by_record");
-	DBUG_ASSERT(ha_table_flags() &
-		HA_PRIMARY_KEY_REQUIRED_FOR_POSITION);
+	assert(ha_table_flags() &
+	       HA_PRIMARY_KEY_REQUIRED_FOR_POSITION);
 	/* TODO: Support HA_READ_BEFORE_WRITE_REMOVAL */
 	/* Set m_last_part correctly. */
 	if (unlikely(get_part_for_delete(record,

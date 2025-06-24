@@ -1,13 +1,25 @@
-/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
+
+   Without limiting anything contained in the foregoing, this file,
+   which is part of C Driver for MySQL (Connector/C), is also subject to the
+   Universal FOSS Exception, version 1.0, a copy of which can be found at
+   http://oss.oracle.com/licenses/universal-foss-exception.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -60,6 +72,16 @@ PSI_memory_key key_memory_NET_compress_packet;
 #define MYSQL_CLIENT
 #endif /*EMBEDDED_LIBRARY */
 
+// Workaround for compiler bug
+// ld.so.1: mysqld: fatal: relocation error: file sql/mysqld:
+//          symbol OPENSSL_sk_new_null: referenced symbol not found
+// openssl/safestack.h has lots of pragma weak <function>
+// Taking the address of the function solves the problem.
+// (note, do not make it static, it may be optimized away)
+#if defined(HAVE_TLSv13) && defined(__SUNPRO_CC)
+#include <openssl/ssl.h>
+void *address_of_sk_new_null = &OPENSSL_sk_new_null;
+#endif
 
 /*
   The following handles the differences when this is linked between the
@@ -197,9 +219,19 @@ void net_clear(NET *net,
 {
   DBUG_ENTER("net_clear");
 
+  DBUG_EXECUTE_IF("simulate_bad_field_length_1", {
+    net->pkt_nr= net->compress_pkt_nr= 0;
+    net->write_pos= net->buff;
+    DBUG_VOID_RETURN;
+  });
+  DBUG_EXECUTE_IF("simulate_bad_field_length_2", {
+    net->pkt_nr= net->compress_pkt_nr= 0;
+    net->write_pos= net->buff;
+    DBUG_VOID_RETURN;
+  });
 #if !defined(EMBEDDED_LIBRARY)
   /* Ensure the socket buffer is empty, except for an EOF (at least 1). */
-  DBUG_ASSERT(!check_buffer || (vio_pending(net->vio) <= 1));
+  assert(!check_buffer || (vio_pending(net->vio) <= 1));
 #endif
 
   /* Ready for new command */
@@ -666,6 +698,16 @@ static my_bool net_read_raw_loop(NET *net, size_t count)
   bool eof= false;
   unsigned int retry_count= 0;
   uchar *buf= net->buff + net->where_b;
+  my_bool timeout_on_full_packet = FALSE;
+  my_bool is_packet_timeout = FALSE;
+
+#ifdef MYSQL_SERVER
+  NET_SERVER* server_ext = static_cast<NET_SERVER*>(net->extension);
+  if (server_ext) timeout_on_full_packet = server_ext->timeout_on_full_packet;
+#endif
+
+  time_t start_time = 0;
+  if (timeout_on_full_packet) start_time = time(&start_time);
 
   while (count)
   {
@@ -692,6 +734,15 @@ static my_bool net_read_raw_loop(NET *net, size_t count)
 #ifdef MYSQL_SERVER
     thd_increment_bytes_received(recvcnt);
 #endif
+
+    if (timeout_on_full_packet) {
+        time_t current_time = time(&current_time);
+        if (static_cast<unsigned int>(current_time - start_time) >
+            net->read_timeout) {
+            is_packet_timeout = TRUE;
+            break;
+        }
+    }
   }
 
   /* On failure, propagate the error code. */
@@ -701,7 +752,7 @@ static my_bool net_read_raw_loop(NET *net, size_t count)
     net->error= 2;
 
     /* Interrupted by a timeout? */
-    if (!eof && vio_was_timeout(net->vio))
+    if (!eof && (vio_was_timeout(net->vio) || is_packet_timeout))
       net->last_errno= ER_NET_READ_INTERRUPTED;
     else
       net->last_errno= ER_NET_READ_ERROR;
@@ -749,8 +800,8 @@ static my_bool net_read_packet_header(NET *net)
   if (server_extension != NULL)
   {
     void *user_data= server_extension->m_user_data;
-    DBUG_ASSERT(server_extension->m_before_header != NULL);
-    DBUG_ASSERT(server_extension->m_after_header != NULL);
+    assert(server_extension->m_before_header != NULL);
+    assert(server_extension->m_after_header != NULL);
 
     server_extension->m_before_header(net, user_data, count);
     rc= net_read_raw_loop(net, count);
@@ -788,7 +839,7 @@ static my_bool net_read_packet_header(NET *net)
     my_message_local(ERROR_LEVEL,
                      "packets out of order (found %u, expected %u)",
                      (uint) pkt_nr, net->pkt_nr);
-    DBUG_ASSERT(pkt_nr == net->pkt_nr);
+    assert(pkt_nr == net->pkt_nr);
 #endif
     return TRUE;
   }
@@ -831,8 +882,8 @@ static size_t net_read_packet(NET *net, size_t *complen)
       The right-hand expression
       must match the size of the buffer allocated in net_realloc().
     */
-    DBUG_ASSERT(net->where_b + NET_HEADER_SIZE + sizeof(uint32) <=
-                net->max_packet + NET_HEADER_SIZE + COMP_HEADER_SIZE);
+    assert(net->where_b + NET_HEADER_SIZE + sizeof(uint32) <=
+           net->max_packet + NET_HEADER_SIZE + COMP_HEADER_SIZE);
 
     /*
       If the packet is compressed then complen > 0 and contains the
@@ -963,7 +1014,7 @@ my_net_read(NET *net)
               multi_byte_packet on.
               Thus there shall never be a non-zero first_packet_offset here.
             */
-            DBUG_ASSERT(first_packet_offset == 0);
+            assert(first_packet_offset == 0);
             /* Remove packet header for second packet */
             memmove(net->buff + start_of_packet,
               net->buff + start_of_packet + NET_HEADER_SIZE,

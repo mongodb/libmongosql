@@ -1,13 +1,20 @@
-/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -92,14 +99,11 @@ PSI_memory_key mi_key_memory_stPageList_pages;
 PSI_memory_key mi_key_memory_keycache_thread_var;
 
 #ifdef HAVE_PSI_INTERFACE
-PSI_mutex_key mi_key_mutex_MYISAM_SHARE_intern_lock,
-  mi_key_mutex_MI_SORT_INFO_mutex, mi_key_mutex_MI_CHECK_print_msg;
+PSI_mutex_key mi_key_mutex_MYISAM_SHARE_intern_lock;
 
-static PSI_mutex_info all_myisam_mutexes[]=
+static PSI_mutex_info all_myisam_mutexes[] =
 {
-  { &mi_key_mutex_MI_SORT_INFO_mutex, "MI_SORT_INFO::mutex", 0},
-  { &mi_key_mutex_MYISAM_SHARE_intern_lock, "MYISAM_SHARE::intern_lock", 0},
-  { &mi_key_mutex_MI_CHECK_print_msg, "MI_CHECK::print_msg", 0}
+  { &mi_key_mutex_MYISAM_SHARE_intern_lock, "MYISAM_SHARE::intern_lock", 0}
 };
 
 PSI_rwlock_key mi_key_rwlock_MYISAM_SHARE_key_root_lock,
@@ -111,12 +115,10 @@ static PSI_rwlock_info all_myisam_rwlocks[]=
   { &mi_key_rwlock_MYISAM_SHARE_mmap_lock, "MYISAM_SHARE::mmap_lock", 0}
 };
 
-PSI_cond_key mi_key_cond_MI_SORT_INFO_cond;
 PSI_cond_key mi_keycache_thread_var_suspend;
 
 static PSI_cond_info all_myisam_conds[]=
 {
-  { &mi_key_cond_MI_SORT_INFO_cond, "MI_SORT_INFO::cond", 0},
   { &mi_keycache_thread_var_suspend, "keycache_thread_var::suspend", 0}
 };
 

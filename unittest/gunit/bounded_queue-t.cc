@@ -1,13 +1,20 @@
-/* Copyright (c) 2010, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -182,9 +189,9 @@ private:
 // Google Test recommends DeathTest suffix for classes used in death tests.
 typedef BoundedQueueTest BoundedQueueDeathTest;
 
-#if !defined(DBUG_OFF)
+#if !defined(NDEBUG)
 /*
-  Verifies that we DBUG_ASSERT if trying to push to an un-initialized queue.
+  Verifies that we assert if trying to push to an un-initialized queue.
  */
 TEST_F(BoundedQueueDeathTest, DieIfNotInitialized)
 {
@@ -195,8 +202,8 @@ TEST_F(BoundedQueueDeathTest, DieIfNotInitialized)
 }
 
 /*
-  Verifies that popping an empty queue hits a DBUG_ASSERT.
- */
+  Verifies that popping an empty queue hits a assert.
+*/
 TEST_F(BoundedQueueDeathTest, DieIfPoppingEmptyQueue)
 {
   EXPECT_EQ(0, m_queue.init(0, true, test_key_compare,
@@ -205,7 +212,7 @@ TEST_F(BoundedQueueDeathTest, DieIfPoppingEmptyQueue)
   EXPECT_DEATH_IF_SUPPORTED(m_queue.pop(),
                             ".*Assertion .*elements > 0.*");
 }
-#endif  // !defined(DBUG_OFF)
+#endif  // !defined(NDEBUG)
 
 
 /*

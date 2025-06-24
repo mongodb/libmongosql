@@ -1,20 +1,28 @@
 /*
-   Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2013, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
 */
 
+#include "init_net_server_extension.h"
 #include "shared_memory_connection.h"
 
 #include "violite.h"                    // Vio
@@ -86,8 +94,10 @@ public:
   {
     THD* thd= Channel_info::create_thd();
 
-    if (thd != NULL)
-      thd->security_context()->set_host_ptr(my_localhost, strlen(my_localhost));
+    if (thd != NULL) {
+        init_net_server_extension(thd);
+        thd->security_context()->set_host_ptr(my_localhost, strlen(my_localhost));
+    }
     return thd;
   }
 
@@ -97,20 +107,25 @@ public:
   {
     Channel_info::send_error_and_close_channel(errorcode, error, senderror);
 
-    if (m_handle_client_file_map)
-      CloseHandle(m_handle_client_file_map);
-    if (m_handle_client_map)
-      CloseHandle(m_handle_client_map);
-    if (m_event_server_wrote)
-      CloseHandle(m_event_server_wrote);
-    if (m_event_server_read)
-      CloseHandle(m_event_server_read);
-    if (m_event_client_wrote)
-      CloseHandle(m_event_client_wrote);
-    if (m_event_client_read)
-      CloseHandle(m_event_client_read);
-    if (m_event_conn_closed)
-      CloseHandle(m_event_conn_closed);
+    // Channel_info::send_error_and_close_channel will have closed
+    // handles on senderror
+    if (!senderror)
+    {
+      if (m_handle_client_file_map)
+        CloseHandle(m_handle_client_file_map);
+      if (m_handle_client_map)
+        UnmapViewOfFile(m_handle_client_map);
+      if (m_event_server_wrote)
+        CloseHandle(m_event_server_wrote);
+      if (m_event_server_read)
+        CloseHandle(m_event_server_read);
+      if (m_event_client_wrote)
+        CloseHandle(m_event_client_wrote);
+      if (m_event_client_read)
+        CloseHandle(m_event_client_read);
+      if (m_event_conn_closed)
+        CloseHandle(m_event_conn_closed);
+    }
   }
 };
 
@@ -126,6 +141,7 @@ void Shared_mem_listener::close_shared_mem()
 
   my_security_attr_free(m_sa_event);
   my_security_attr_free(m_sa_mapping);
+  my_security_attr_free(m_sa_mutex);
   if (m_connect_map)
     UnmapViewOfFile(m_connect_map);
   if (m_connect_named_mutex)
@@ -158,6 +174,9 @@ bool Shared_mem_listener::setup_listener()
                               GENERIC_ALL, FILE_MAP_READ | FILE_MAP_WRITE))
     goto error;
 
+  if (my_security_attr_create(&m_sa_mutex, &errmsg, GENERIC_ALL, SYNCHRONIZE))
+    goto error;
+
   /*
     The name of event and file-mapping events create agree next rule:
       shared_memory_base_name+unique_part
@@ -182,7 +201,7 @@ bool Shared_mem_listener::setup_listener()
   }
 
   my_stpcpy(m_suffix_pos, "CONNECT_NAMED_MUTEX");
-  m_connect_named_mutex= CreateMutex(NULL, FALSE, m_temp_buffer);
+  m_connect_named_mutex= CreateMutex(m_sa_mutex, FALSE, m_temp_buffer);
   if (m_connect_named_mutex == NULL)
   {
     errmsg="Unable to create connect named mutex.";

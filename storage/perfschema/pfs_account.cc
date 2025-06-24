@@ -1,13 +1,20 @@
-/* Copyright (c) 2010, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2023, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; version 2 of the License.
+  it under the terms of the GNU General Public License, version 2.0,
+  as published by the Free Software Foundation.
+
+  This program is also distributed with certain software (including
+  but not limited to OpenSSL) that is licensed under separate terms,
+  as designated in a particular file or component or in included license
+  documentation.  The authors of MySQL hereby grant you an additional
+  permission to link the program and your derivative works with the
+  separately licensed software that they have included with MySQL.
 
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  GNU General Public License, version 2.0, for more details.
 
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software
@@ -67,9 +74,9 @@ static uchar *account_hash_get_key(const uchar *entry, size_t *length,
   const PFS_account *account;
   const void *result;
   typed_entry= reinterpret_cast<const PFS_account* const *> (entry);
-  DBUG_ASSERT(typed_entry != NULL);
+  assert(typed_entry != NULL);
   account= *typed_entry;
-  DBUG_ASSERT(account != NULL);
+  assert(account != NULL);
   *length= account->m_key.m_key_length;
   result= account->m_key.m_hash_key;
   return const_cast<uchar*> (reinterpret_cast<const uchar*> (result));
@@ -116,8 +123,8 @@ static void set_account_key(PFS_account_key *key,
                               const char *user, uint user_length,
                               const char *host, uint host_length)
 {
-  DBUG_ASSERT(user_length <= USERNAME_LENGTH);
-  DBUG_ASSERT(host_length <= HOSTNAME_LENGTH);
+  assert(user_length <= USERNAME_LENGTH);
+  assert(host_length <= HOSTNAME_LENGTH);
 
   char *ptr= &key->m_hash_key[0];
   if (user_length > 0)
@@ -520,30 +527,18 @@ void PFS_account::aggregate_memory(bool alive, PFS_user *safe_user, PFS_host *sa
 
 void PFS_account::aggregate_status(PFS_user *safe_user, PFS_host *safe_host)
 {
-  if (likely(safe_user != NULL && safe_host != NULL))
-  {
-    /*
-      Aggregate STATUS_BY_ACCOUNT to:
-      - STATUS_BY_USER
-      - STATUS_BY_HOST
-    */
-    safe_user->m_status_stats.aggregate(& m_status_stats);
-    safe_host->m_status_stats.aggregate(& m_status_stats);
-    m_status_stats.reset();
-    return;
-  }
+  /*
+    Never aggregate to global_status_var,
+    because of the parallel THD -> global_status_var flow.
+  */
 
   if (safe_user != NULL)
   {
     /*
       Aggregate STATUS_BY_ACCOUNT to:
       - STATUS_BY_USER
-      - GLOBAL_STATUS
     */
     safe_user->m_status_stats.aggregate(& m_status_stats);
-    m_status_stats.aggregate_to(& global_status_var);
-    m_status_stats.reset();
-    return;
   }
 
   if (safe_host != NULL)
@@ -553,15 +548,8 @@ void PFS_account::aggregate_status(PFS_user *safe_user, PFS_host *safe_host)
       - STATUS_BY_HOST
     */
     safe_host->m_status_stats.aggregate(& m_status_stats);
-    m_status_stats.reset();
-    return;
   }
 
-  /*
-    Aggregate STATUS_BY_ACCOUNT to:
-    - GLOBAL_STATUS
-  */
-  m_status_stats.aggregate_to(& global_status_var);
   m_status_stats.reset();
   return;
 }
@@ -646,7 +634,7 @@ void purge_account(PFS_thread *thread, PFS_account *account)
                     account->m_key.m_key_length));
   if (entry && (entry != MY_ERRPTR))
   {
-    DBUG_ASSERT(*entry == account);
+    assert(*entry == account);
     if (account->get_refcount() == 0)
     {
       lf_hash_delete(&account_hash, pins,

@@ -1,13 +1,20 @@
-/* Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -34,7 +41,7 @@ bool Multisource_info::add_mi(const char* channel_name, Master_info* mi)
   bool res= false;
 
   /* The check of mi exceeding MAX_CHANNELS shall be done in the caller */
-  DBUG_ASSERT(current_mi_count < MAX_CHANNELS);
+  assert(current_mi_count < MAX_CHANNELS);
 
   replication_channel_map::iterator map_it;
   enum_channel_type type= is_group_replication_channel_name(channel_name)
@@ -78,7 +85,7 @@ Master_info* Multisource_info::get_mi(const char* channel_name)
 
   m_channel_map_lock->assert_some_lock();
 
-  DBUG_ASSERT(channel_name != 0);
+  assert(channel_name != 0);
 
   mi_map::iterator it;
   replication_channel_map::iterator map_it;
@@ -107,7 +114,7 @@ Master_info* Multisource_info::get_mi(const char* channel_name)
   DBUG_RETURN(it->second);
 }
 
-void Multisource_info::delete_mi(const char* channel_name)
+bool Multisource_info::delete_mi(const char* channel_name)
 {
   DBUG_ENTER("Multisource_info::delete_mi");
 
@@ -116,7 +123,7 @@ void Multisource_info::delete_mi(const char* channel_name)
   Master_info *mi= 0;
   mi_map::iterator it;
 
-  DBUG_ASSERT(channel_name != 0);
+  assert(channel_name != 0);
 
   replication_channel_map::iterator map_it;
   map_it= rep_channel_map.find(SLAVE_REPLICATION_CHANNEL);
@@ -129,10 +136,19 @@ void Multisource_info::delete_mi(const char* channel_name)
       it == map_it->second.end())
   {
     map_it= rep_channel_map.find(GROUP_REPLICATION_CHANNEL);
-    DBUG_ASSERT(map_it != rep_channel_map.end());
+    assert(map_it != rep_channel_map.end());
 
-    it= map_it->second.find(channel_name);
-    DBUG_ASSERT(it != map_it->second.end());
+    if (map_it != rep_channel_map.end())
+    {
+      it = map_it->second.find(channel_name);
+      assert(it != map_it->second.end());
+    }
+  }
+
+  if (map_it == rep_channel_map.end() || it == map_it->second.end())
+  {
+    // the channel identified by channel_name could not be found
+    DBUG_RETURN(true);
   }
 
 #ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
@@ -140,7 +156,7 @@ void Multisource_info::delete_mi(const char* channel_name)
   /* get the index of mi from rpl_pfs_mi */
   index= get_index_from_rpl_pfs_mi(channel_name);
 
-  DBUG_ASSERT(index != -1);
+  assert(index != -1);
 
   /* set the current index to  0  and decrease current_mi_count */
   rpl_pfs_mi[index] = 0;
@@ -169,7 +185,7 @@ void Multisource_info::delete_mi(const char* channel_name)
     delete mi;
   }
 
-  DBUG_VOID_RETURN;
+  DBUG_RETURN(false);
 }
 
 

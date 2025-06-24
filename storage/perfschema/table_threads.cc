@@ -1,13 +1,20 @@
-/* Copyright (c) 2008, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2008, 2023, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; version 2 of the License.
+  it under the terms of the GNU General Public License, version 2.0,
+  as published by the Free Software Foundation.
+
+  This program is also distributed with certain software (including
+  but not limited to OpenSSL) that is licensed under separate terms,
+  as designated in a particular file or component or in included license
+  documentation.  The authors of MySQL hereby grant you an additional
+  permission to link the program and your derivative works with the
+  separately licensed software that they have included with MySQL.
 
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  GNU General Public License, version 2.0, for more details.
 
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software Foundation,
@@ -115,6 +122,11 @@ TABLE_FIELD_DEF
 table_threads::m_field_def=
 { 17, field_types };
 
+PFS_engine_table_share_state
+table_threads::m_share_state = {
+  false /* m_checked */
+};
+
 PFS_engine_table_share
 table_threads::m_share=
 {
@@ -127,8 +139,9 @@ table_threads::m_share=
   sizeof(PFS_simple_index), /* ref length */
   &m_table_lock,
   &m_field_def,
-  false, /* checked */
-  false  /* perpetual */
+  false, /* m_perpetual */
+  false, /* m_optional */
+  &m_share_state
 };
 
 PFS_engine_table* table_threads::create()
@@ -263,7 +276,7 @@ int table_threads::read_row_values(TABLE *table,
     return HA_ERR_RECORD_DELETED;
 
   /* Set the null bits */
-  DBUG_ASSERT(table->s->null_bytes == 2);
+  assert(table->s->null_bytes == 2);
   buf[0]= 0;
   buf[1]= 0;
 
@@ -336,7 +349,7 @@ int table_threads::read_row_values(TABLE *table,
            server is updating this column for those threads. To prevent this
            kind of issue, an assert is added.
          */
-        DBUG_ASSERT(m_row.m_processlist_state_length <= f->char_length());
+        assert(m_row.m_processlist_state_length <= f->char_length());
         if (m_row.m_processlist_state_length > 0)
           set_field_varchar_utf8(f, m_row.m_processlist_state_ptr,
                                  m_row.m_processlist_state_length);
@@ -379,7 +392,7 @@ int table_threads::read_row_values(TABLE *table,
           f->set_null();
         break;
       default:
-        DBUG_ASSERT(false);
+        assert(false);
       }
     }
   }
@@ -426,7 +439,7 @@ int table_threads::update_row_values(TABLE *table,
       case 16: /* THREAD_OS_ID */
         return HA_ERR_WRONG_COMMAND;
       default:
-        DBUG_ASSERT(false);
+        assert(false);
       }
     }
   }

@@ -1,13 +1,20 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -99,8 +106,8 @@ bool SELECT_LEX::prepare(THD *thd)
   // We may do subquery transformation, or Item substitution:
   Prepare_error_tracker tracker(thd);
 
-  DBUG_ASSERT(this == thd->lex->current_select());
-  DBUG_ASSERT(join == NULL);
+  assert(this == thd->lex->current_select());
+  assert(join == NULL);
 
   SELECT_LEX_UNIT *const unit= master_unit();
 
@@ -166,7 +173,7 @@ bool SELECT_LEX::prepare(THD *thd)
     We are not parsing anymore: any new Items created now are due to
     query rewriting, so stop incrementing counters.
    */
-  DBUG_ASSERT(parsing_place == CTX_NONE);
+  assert(parsing_place == CTX_NONE);
   parsing_place= CTX_NONE;
 
   resolve_place= RESOLVE_SELECT_LIST;
@@ -362,8 +369,15 @@ bool SELECT_LEX::prepare(THD *thd)
 
   sj_candidates= NULL;
 
+  /*
+    When reaching the top-most query block, or the next-to-top query block for
+    the SQL command SET and for SP instructions (indicated with SQLCOM_END),
+    apply local transformations to this query block and all underlying query
+    blocks.
+  */
   if (outer_select() == NULL ||
-      (parent_lex->sql_command == SQLCOM_SET_OPTION &&
+      ((parent_lex->sql_command == SQLCOM_SET_OPTION ||
+       parent_lex->sql_command == SQLCOM_END) &&
        outer_select()->outer_select() == NULL))
   {
     /*
@@ -390,7 +404,7 @@ bool SELECT_LEX::prepare(THD *thd)
       DBUG_RETURN(true);
   }
 
-  DBUG_ASSERT(!thd->is_error());
+  assert(!thd->is_error());
   DBUG_RETURN(false);
 }
 
@@ -527,8 +541,8 @@ bool subquery_allows_materialization(Item_in_subselect *predicate,
 {
   const uint elements= predicate->unit->first_select()->item_list.elements;
   DBUG_ENTER("subquery_allows_materialization");
-  DBUG_ASSERT(elements >= 1);
-  DBUG_ASSERT(predicate->left_expr->cols() == elements);
+  assert(elements >= 1);
+  assert(predicate->left_expr->cols() == elements);
 
   OPT_TRACE_TRANSFORM(&thd->opt_trace, trace_wrapper, trace_mat,
                       select_lex->select_number,
@@ -587,7 +601,7 @@ bool subquery_allows_materialization(Item_in_subselect *predicate,
       This is a temporary fix for BUG#36752; see bug report for
       description of restrictions we need to put on the compared expressions.
     */
-    DBUG_ASSERT(predicate->left_expr->fixed);
+    assert(predicate->left_expr->fixed);
     // @see comment in Item_subselect::element_index()
     bool has_nullables= predicate->left_expr->maybe_null;
 
@@ -635,7 +649,7 @@ bool subquery_allows_materialization(Item_in_subselect *predicate,
       }
     }
   }
-  DBUG_ASSERT(cause != NULL);
+  assert(cause != NULL);
   trace_mat.add("possible", false).add_alnum("cause", cause);
   DBUG_RETURN(false);
 }
@@ -655,10 +669,10 @@ static TABLE_LIST **make_leaf_tables(TABLE_LIST **list, TABLE_LIST *tables)
   for (TABLE_LIST *table= tables; table; table= table->next_local)
   {
     // A mergable view is not allowed to have a table pointer.
-    DBUG_ASSERT(!(table->is_view() && table->is_merged() && table->table));
+    assert(!(table->is_view() && table->is_merged() && table->table));
     if (table->merge_underlying_list)
     {
-      DBUG_ASSERT(table->is_merged());
+      assert(table->is_merged());
 
       list= make_leaf_tables(list, table->merge_underlying_list);
     }
@@ -734,9 +748,9 @@ bool st_select_lex::setup_tables(THD *thd, TABLE_LIST *tables,
 {
   DBUG_ENTER("st_select_lex::setup_tables");
 
-  DBUG_ASSERT ((select_insert && !tables->next_name_resolution_table) ||
-               !tables || 
-               (context.table_list && context.first_name_resolution_table));
+  assert ((select_insert && !tables->next_name_resolution_table) ||
+          !tables || 
+          (context.table_list && context.first_name_resolution_table));
 
   make_leaf_tables(&leaf_tables, tables);
 
@@ -858,7 +872,7 @@ bool st_select_lex::resolve_derived(THD *thd, bool apply_semijoin)
 {
   DBUG_ENTER("st_select_lex::resolve_derived");
 
-  DBUG_ASSERT(derived_table_count);
+  assert(derived_table_count);
 
   // Prepare derived tables and views that belong to this query block.
   for (TABLE_LIST *tl= get_table_list(); tl; tl= tl->next_local)
@@ -892,8 +906,8 @@ bool st_select_lex::resolve_derived(THD *thd, bool apply_semijoin)
   for (TABLE_LIST *tl= get_table_list(); tl; tl= tl->next_local)
   {
     // Ensure that any derived table is merged or materialized after prepare:
-    DBUG_ASSERT(first_execution || !tl->is_view_or_derived() ||
-                tl->is_merged() || tl->uses_materialization());
+    assert(first_execution || !tl->is_view_or_derived() ||
+           tl->is_merged() || tl->uses_materialization());
     if (!tl->is_view_or_derived() || tl->is_merged())
       continue;
     if (tl->setup_materialized_derived(thd))
@@ -914,7 +928,7 @@ bool st_select_lex::resolve_derived(THD *thd, bool apply_semijoin)
     {
       if (!tl->is_view_or_derived() || tl->table != NULL)
         continue;
-      DBUG_ASSERT(!tl->is_merged());
+      assert(!tl->is_merged());
       if (tl->resolve_derived(thd, apply_semijoin))
         DBUG_RETURN(true);        /* purecov: inspected */
       if (tl->setup_materialized_derived(thd))
@@ -966,7 +980,7 @@ bool SELECT_LEX::resolve_subquery(THD *thd)
     EXEC_UNSPECIFIED.
   */
   Item_subselect *subq_predicate= master_unit()->item;
-  DBUG_ASSERT(subq_predicate);
+  assert(subq_predicate);
   /**
     @note
     In this case: IN (SELECT ... UNION SELECT ...), SELECT_LEX::prepare() is
@@ -1022,9 +1036,10 @@ bool SELECT_LEX::resolve_subquery(THD *thd)
       a single table UPDATE/DELETE (TODO: We should handle this at some
       point by switching to multi-table UPDATE/DELETE)
       7. We're not in a confluent table-less subquery, like "SELECT 1".
-      8. No execution method was already chosen (by a prepared statement)
-      9. Parent select is not a confluent table-less select
-      10. Neither parent nor child select have STRAIGHT_JOIN option.
+      8. No execution method was already chosen (by a prepared statement).
+      9. Parent query block is not a confluent table-less query block.
+      10. Neither parent nor child query block has straight join.
+      11. Parent query block does not prohibit semi-join.
   */
   if (semijoin_enabled(thd) &&
       in_predicate &&                                                   // 1
@@ -1035,12 +1050,13 @@ bool SELECT_LEX::resolve_subquery(THD *thd)
        outer->resolve_place == st_select_lex::RESOLVE_JOIN_NEST) &&     // 5a
       !outer->semijoin_disallowed &&                                    // 5b
       outer->sj_candidates &&                                           // 6
-      leaf_table_count &&                                               // 7
+      leaf_table_count > 0 &&                                           // 7
       in_predicate->exec_method ==
                            Item_exists_subselect::EXEC_UNSPECIFIED &&   // 8
       outer->leaf_table_count &&                                        // 9
       !((active_options() | outer->active_options()) &
-       SELECT_STRAIGHT_JOIN))                                           //10
+        SELECT_STRAIGHT_JOIN) &&                                        //10
+      !(outer->active_options() & SELECT_NO_SEMI_JOIN))                 //11
   {
     DBUG_PRINT("info", ("Subquery is semi-join conversion candidate"));
 
@@ -1083,7 +1099,7 @@ bool SELECT_LEX::setup_wild(THD *thd)
 {
   DBUG_ENTER("SELECT_LEX::setup_wild");
 
-  DBUG_ASSERT(with_wild);
+  assert(with_wild);
 
   // PS/SP uses arena so that changes are made permanently.
   Prepared_stmt_arena_holder ps_arena_holder(thd);
@@ -1095,11 +1111,10 @@ bool SELECT_LEX::setup_wild(THD *thd)
   {
     Item_field *item_field;
     if (item->type() == Item::FIELD_ITEM &&
-        (item_field= (Item_field *) item) &&
-        item_field->field_name &&
-        item_field->field_name[0] == '*' &&
-        !item_field->field)
+        (item_field= down_cast<Item_field *>(item)) &&
+        item_field->is_asterisk())
     {
+      assert(item_field->field == NULL);
       const uint elem= fields_list.elements;
       const bool any_privileges= item_field->any_privileges;
       Item_subselect *subsel= master_unit()->item;
@@ -1223,8 +1238,8 @@ bool SELECT_LEX::setup_conds(THD *thd)
 
   is_item_list_lookup= save_is_item_list_lookup;
 
-  DBUG_ASSERT(thd->lex->current_select() == this);
-  DBUG_ASSERT(!thd->is_error());
+  assert(thd->lex->current_select() == this);
+  assert(!thd->is_error());
   DBUG_RETURN(false);
 }
 
@@ -1443,7 +1458,7 @@ SELECT_LEX::simplify_joins(THD *thd,
 
         if (join_cond != table->join_cond())
         {
-          DBUG_ASSERT(join_cond);
+          assert(join_cond);
           table->set_join_cond(join_cond);
         }
       }
@@ -1494,7 +1509,7 @@ SELECT_LEX::simplify_joins(THD *thd,
             It is always a new item as both the upper-level condition and a
             join condition existed
           */
-          DBUG_ASSERT(!new_cond->fixed);
+          assert(!new_cond->fixed);
           if (new_cond->fix_fields(thd, NULL))
             DBUG_RETURN(true);
 
@@ -1533,7 +1548,7 @@ SELECT_LEX::simplify_joins(THD *thd,
       table->dep_tables|= table->join_cond()->used_tables();
 
       // At this point the joined tables always have an embedding join nest:
-      DBUG_ASSERT(table->embedding);
+      assert(table->embedding);
 
       table->dep_tables&= ~table->embedding->nested_join->used_tables;
 
@@ -1684,8 +1699,8 @@ static int subq_sj_candidate_cmp(Item_exists_subselect* const *el1,
   /*
     Remove this assert when we support semijoin on non-IN subqueries.
   */
-  DBUG_ASSERT((*el1)->substype() == Item_subselect::IN_SUBS &&
-              (*el2)->substype() == Item_subselect::IN_SUBS);
+  assert((*el1)->substype() == Item_subselect::IN_SUBS &&
+         (*el2)->substype() == Item_subselect::IN_SUBS);
   return ((*el1)->sj_convert_priority < (*el2)->sj_convert_priority) ? 1 : 
          ( ((*el1)->sj_convert_priority == (*el2)->sj_convert_priority)? 0 : -1);
 }
@@ -1760,12 +1775,12 @@ static void fix_tables_after_pullout(st_select_lex *parent_select,
          transl < tr->field_translation_end;
          transl++)
     {
-      DBUG_ASSERT(transl->item->fixed);
+      assert(transl->item->fixed);
       transl->item->fix_after_pullout(parent_select, removed_select);
     }
     // Update used table info for the WHERE clause of the derived table
-    DBUG_ASSERT(!tr->derived_where_cond ||
-                tr->derived_where_cond->fixed);
+    assert(!tr->derived_where_cond ||
+           tr->derived_where_cond->fixed);
     if (tr->derived_where_cond)
       tr->derived_where_cond->fix_after_pullout(parent_select,
                                                 removed_select);
@@ -1852,7 +1867,7 @@ SELECT_LEX::convert_subquery_to_semijoin(Item_exists_subselect *subq_pred)
   THD *const thd= subq_pred->unit->thd;
   DBUG_ENTER("convert_subquery_to_semijoin");
 
-  DBUG_ASSERT(subq_pred->substype() == Item_subselect::IN_SUBS);
+  assert(subq_pred->substype() == Item_subselect::IN_SUBS);
 
   bool outer_join= false;  // True if predicate is inner to an outer join
 
@@ -1967,6 +1982,20 @@ SELECT_LEX::convert_subquery_to_semijoin(Item_exists_subselect *subq_pred)
           break;
         }
       }
+
+      /*
+        outer_tbl is replaced by wrap_nest.
+        For subselects, update embedding_join_nest to point to wrap_nest
+        instead of outer_tbl
+      */
+      for (Item_exists_subselect **subquery= sj_candidates->begin();
+           subquery < sj_candidates->end();
+           subquery++)
+      {
+        if ((*subquery)->embedding_join_nest == outer_tbl)
+          (*subquery)->embedding_join_nest= wrap_nest;
+      }
+
       /*
         Ok now wrap_nest 'contains' outer_tbl and we're ready to add the 
         semi-join nest into it
@@ -2054,7 +2083,7 @@ SELECT_LEX::convert_subquery_to_semijoin(Item_exists_subselect *subq_pred)
   {
     Item_in_subselect *in_subq_pred= (Item_in_subselect *)subq_pred;
 
-    DBUG_ASSERT(is_fixed_or_outer_ref(in_subq_pred->left_expr));
+    assert(is_fixed_or_outer_ref(in_subq_pred->left_expr));
 
     in_subq_pred->exec_method= Item_exists_subselect::EXEC_SEMI_JOIN;
     /*
@@ -2246,7 +2275,7 @@ bool SELECT_LEX::merge_derived(THD *thd, TABLE_LIST *derived_table)
   SELECT_LEX_UNIT *const derived_unit= derived_table->derived_unit();
 
   // A derived table must be prepared before we can merge it
-  DBUG_ASSERT(derived_unit->is_prepared());
+  assert(derived_unit->is_prepared());
 
   LEX *const lex= parent_lex;
 
@@ -2421,7 +2450,7 @@ bool SELECT_LEX::merge_derived(THD *thd, TABLE_LIST *derived_table)
      the outer query contains only one table reference.
     */
     // LIMIT currently blocks derived table merge
-    DBUG_ASSERT(!derived_select->has_limit());
+    assert(!derived_select->has_limit());
 
     if ((lex->sql_command == SQLCOM_SELECT ||
          lex->sql_command == SQLCOM_UPDATE ||
@@ -2431,7 +2460,32 @@ bool SELECT_LEX::merge_derived(THD *thd, TABLE_LIST *derived_table)
           is_distinct() ||
           is_ordered() ||
           get_table_list()->next_local != NULL))
+    {
       order_list.push_back(&derived_select->order_list);
+      /*
+        If at outer-most level (not within another derived table), ensure
+        the ordering columns are marked in read_set, since columns selected
+        from derived tables are not marked in initial resolving.
+      */
+      if (!thd->derived_tables_processing)
+      {
+        Mark_field mf(thd->mark_used_columns);
+        for (ORDER *o = derived_select->order_list.first; o != NULL;
+             o = o->next) {
+          o->item[0]->walk(&Item::mark_field_in_map, Item::WALK_POSTFIX,
+                           pointer_cast<uchar *>(&mf));
+          /*
+            If the expression in order by was part of the select list
+            of the merged derived query block and if it is unused in the
+            outer query block, delete_unused_merged_columns() could
+            delete the select expression. So, we set that the merged
+            order by expression is used and therefore should not be deleted.
+          */
+          o->item[0]->walk(&Item::propagate_set_derived_used,
+                           Item::WALK_POSTFIX, NULL);
+        }
+      }
+    }
     else
     {
       derived_select->empty_order_list(this);
@@ -2504,7 +2558,7 @@ static bool replace_subcondition(THD *thd, Item **tree,
   }
   else
     // If we came here it means there were an error during prerequisites check.
-    DBUG_ASSERT(FALSE);
+    assert(FALSE);
 
   return TRUE;
 }
@@ -2595,12 +2649,12 @@ bool SELECT_LEX::flatten_subqueries()
     /*
       Currently, we only support transformation of IN subqueries.
     */
-    DBUG_ASSERT((*subq)->substype() == Item_subselect::IN_SUBS);
+    assert((*subq)->substype() == Item_subselect::IN_SUBS);
 
     st_select_lex *child_select= (*subq)->unit->first_select();
 
     // Check that we proceeded bottom-up
-    DBUG_ASSERT(child_select->sj_candidates == NULL);
+    assert(child_select->sj_candidates == NULL);
 
     (*subq)->sj_convert_priority= 
       (((*subq)->unit->uncacheable & UNCACHEABLE_DEPENDENT) ? MAX_TABLES : 0) +
@@ -2701,6 +2755,19 @@ bool SELECT_LEX::flatten_subqueries()
 
   sj_candidates->clear();
   DBUG_RETURN(FALSE);
+}
+
+bool SELECT_LEX::is_in_select_list(Item *cand) {
+  List_iterator<Item> li(fields_list);
+  Item *item;
+  while ((item = li++)) {
+    // Use a walker to detect if cand is present in this select item
+
+    if (item->walk(&Item::find_item_processor, Item::WALK_SUBQUERY_POSTFIX,
+                   pointer_cast<uchar *>(cand)))
+      return true;
+  }
+  return false;
 }
 
 /**
@@ -2965,10 +3032,10 @@ void SELECT_LEX::remove_redundant_subquery_clauses(THD *thd,
     return;
 
   // A subquery that is not single row should be one of IN/ALL/ANY/EXISTS.
-  DBUG_ASSERT (subq_predicate->substype() == Item_subselect::EXISTS_SUBS ||
-               subq_predicate->substype() == Item_subselect::IN_SUBS     ||
-               subq_predicate->substype() == Item_subselect::ALL_SUBS    ||
-               subq_predicate->substype() == Item_subselect::ANY_SUBS);
+  assert (subq_predicate->substype() == Item_subselect::EXISTS_SUBS ||
+          subq_predicate->substype() == Item_subselect::IN_SUBS     ||
+          subq_predicate->substype() == Item_subselect::ALL_SUBS    ||
+          subq_predicate->substype() == Item_subselect::ANY_SUBS);
 
   enum change
   {
@@ -3043,9 +3110,15 @@ void SELECT_LEX::empty_order_list(SELECT_LEX *sl)
 {
   for (ORDER *o= order_list.first; o != NULL; o= o->next)
   {
-    if (*o->item == o->item_ptr)
+    /*
+      Do not remove the order by expression if it has a view
+      reference. There is possibility that this view reference could
+      be used elsewhere in the query
+    */
+    if (*o->item == o->item_ptr) {
       (*o->item)->walk(&Item::clean_up_after_removal, walk_subquery,
                        pointer_cast<uchar *>(sl));
+    }
   }
   order_list.empty();
   while (hidden_order_field_count-- > 0)
@@ -3268,7 +3341,7 @@ find_order_in_list(THD *thd, Ref_ptr_array ref_pointer_array,
     item is removed from the query. In that case, we must call walk()
     with clean_up_after_removal() on the old order->item.
   */
-  DBUG_ASSERT(order_item == *order->item);
+  assert(order_item == *order->item);
   order->item= &ref_pointer_array[el];
   return FALSE;
 }
@@ -3289,7 +3362,7 @@ find_order_in_list(THD *thd, Ref_ptr_array ref_pointer_array,
 bool setup_order(THD *thd, Ref_ptr_array ref_pointer_array, TABLE_LIST *tables,
                  List<Item> &fields, List<Item> &all_fields, ORDER *order)
 {
-  DBUG_ASSERT(order);
+  assert(order);
 
   SELECT_LEX *const select= thd->lex->current_select();
 
@@ -3433,7 +3506,7 @@ bool SELECT_LEX::setup_order_final(THD *thd)
 
 bool SELECT_LEX::setup_group(THD *thd)
 {
-  DBUG_ASSERT(group_list.elements);
+  assert(group_list.elements);
 
   thd->where="group statement";
   for (ORDER *group= group_list.first; group; group= group->next)
@@ -3662,7 +3735,7 @@ void SELECT_LEX::delete_unused_merged_columns(List<TABLE_LIST> *tables)
       {
         Item *const item= transl->item;
 
-        DBUG_ASSERT(item->fixed);
+        assert(item->fixed);
         if (!item->has_subquery())
           continue;
 

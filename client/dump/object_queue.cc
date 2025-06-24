@@ -1,14 +1,21 @@
 /*
-  Copyright (c) 2015, 2016 Oracle and/or its affiliates. All rights reserved.
+  Copyright (c) 2015, 2023, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; version 2 of the License.
+  it under the terms of the GNU General Public License, version 2.0,
+  as published by the Free Software Foundation.
+
+  This program is also distributed with certain software (including
+  but not limited to OpenSSL) that is licensed under separate terms,
+  as designated in a particular file or component or in included license
+  documentation.  The authors of MySQL hereby grant you an additional
+  permission to link the program and your derivative works with the
+  separately licensed software that they have included with MySQL.
 
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  GNU General Public License, version 2.0, for more details.
 
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software
@@ -150,7 +157,25 @@ void Object_queue::read_object(Item_processing_data* item_to_process)
 
 void Object_queue::stop_queue()
 {
-  m_is_queue_running= false;
+  /*
+    In case of error we stop all the running queues. Make sure the
+    cleanup of the items is done properly.
+  */
+  if (m_is_queue_running) {
+    Item_processing_data *item_to_process= NULL;
+    do
+    {
+      {
+        my_boost::mutex::scoped_lock lock(m_queue_mutex);
+        if (m_items_ready_for_processing.size() == 0)
+          break;
+        item_to_process = m_items_ready_for_processing.front();
+        m_items_ready_for_processing.pop();
+      }
+      this->object_processing_ends(item_to_process);
+    } while(item_to_process != NULL);
+    m_is_queue_running = false;
+  }
 }
 
 Object_queue::~Object_queue()

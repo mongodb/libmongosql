@@ -1,13 +1,20 @@
-/* Copyright (c) 2010, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2023, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; version 2 of the License.
+  it under the terms of the GNU General Public License, version 2.0,
+  as published by the Free Software Foundation.
+
+  This program is also distributed with certain software (including
+  but not limited to OpenSSL) that is licensed under separate terms,
+  as designated in a particular file or component or in included license
+  documentation.  The authors of MySQL hereby grant you an additional
+  permission to link the program and your derivative works with the
+  separately licensed software that they have included with MySQL.
 
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  GNU General Public License, version 2.0, for more details.
 
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software Foundation,
@@ -160,6 +167,11 @@ TABLE_FIELD_DEF
 table_events_transactions_current::m_field_def=
 {24 , field_types };
 
+PFS_engine_table_share_state
+table_events_transactions_current::m_share_state = {
+  false /* m_checked */
+};
+
 PFS_engine_table_share
 table_events_transactions_current::m_share=
 {
@@ -172,11 +184,17 @@ table_events_transactions_current::m_share=
   sizeof(PFS_simple_index), /* ref length */
   &m_table_lock,
   &m_field_def,
-  false, /* checked */
-  false  /* perpetual */
+  false, /* m_perpetual */
+  false, /* m_optional */
+  &m_share_state
 };
 
 THR_LOCK table_events_transactions_history::m_table_lock;
+
+PFS_engine_table_share_state
+table_events_transactions_history::m_share_state = {
+  false /* m_checked */
+};
 
 PFS_engine_table_share
 table_events_transactions_history::m_share=
@@ -190,11 +208,17 @@ table_events_transactions_history::m_share=
   sizeof(pos_events_transactions_history), /* ref length */
   &m_table_lock,
   &table_events_transactions_current::m_field_def,
-  false, /* checked */
-  false  /* perpetual */
+  false, /* m_perpetual */
+  false, /* m_optional */
+  &m_share_state
 };
 
 THR_LOCK table_events_transactions_history_long::m_table_lock;
+
+PFS_engine_table_share_state
+table_events_transactions_history_long::m_share_state = {
+  false /* m_checked */
+};
 
 PFS_engine_table_share
 table_events_transactions_history_long::m_share=
@@ -208,8 +232,9 @@ table_events_transactions_history_long::m_share=
   sizeof(PFS_simple_index), /* ref length */
   &m_table_lock,
   &table_events_transactions_current::m_field_def,
-  false, /* checked */
-  false  /* perpetual */
+  false, /* m_perpetual */
+  false, /* m_optional */
+  &m_share_state
 };
 
 table_events_transactions_common::table_events_transactions_common
@@ -313,8 +338,8 @@ static const ulong XID_BUFFER_SIZE= XIDDATASIZE*2 + 2 + 1;
 */
 static uint xid_to_hex(char *buf, size_t buf_len, PSI_xid *xid, size_t offset, size_t length)
 {
-  DBUG_ASSERT(buf_len >= XID_BUFFER_SIZE);
-  DBUG_ASSERT(offset + length <= XIDDATASIZE);
+  assert(buf_len >= XID_BUFFER_SIZE);
+  assert(offset + length <= XIDDATASIZE);
   *buf++= '0';
   *buf++= 'x';
   return bin_to_hex_str(buf, buf_len-2, (char*)(xid->data + offset), length) + 2;
@@ -331,7 +356,7 @@ static uint xid_to_hex(char *buf, size_t buf_len, PSI_xid *xid, size_t offset, s
 */
 static void xid_store(Field *field, PSI_xid *xid, size_t offset, size_t length)
 {
-  DBUG_ASSERT(!xid->is_null());
+  assert(!xid->is_null());
   if (xid_printable(xid, offset, length))
   {
     field->store(xid->data + offset, length, &my_charset_bin);
@@ -370,7 +395,7 @@ int table_events_transactions_common::read_row_values(TABLE *table,
     return HA_ERR_RECORD_DELETED;
 
   /* Set the null bits */
-  DBUG_ASSERT(table->s->null_bytes == 3);
+  assert(table->s->null_bytes == 3);
   buf[0]= 0;
   buf[1]= 0;
   buf[2]= 0;
@@ -488,7 +513,7 @@ int table_events_transactions_common::read_row_values(TABLE *table,
           f->set_null();
         break;
       default:
-        DBUG_ASSERT(false);
+        assert(false);
       }
     }
   }
@@ -643,10 +668,10 @@ int table_events_transactions_history::rnd_pos(const void *pos)
   PFS_thread *pfs_thread;
   PFS_events_transactions *transaction;
 
-  DBUG_ASSERT(events_transactions_history_per_thread != 0);
+  assert(events_transactions_history_per_thread != 0);
   set_position(pos);
 
-  DBUG_ASSERT(m_pos.m_index_2 < events_transactions_history_per_thread);
+  assert(m_pos.m_index_2 < events_transactions_history_per_thread);
 
   pfs_thread= global_thread_container.get(m_pos.m_index_1);
   if (pfs_thread != NULL)

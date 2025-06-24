@@ -1,12 +1,19 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -31,7 +38,7 @@
 #include "sql_user_table.h"
 #include <set>
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 #define HASH_STRING_WITH_QUOTE \
         "$5$BVZy9O>'a+2MH]_?$fpWyabcdiHjfCVqId/quykZzjaA7adpkcen/uiQrtmOK4p4"
 #endif
@@ -115,7 +122,7 @@ void append_user(THD *thd, String *str, LEX_USER *user, bool comma= true,
           /*
             With old_passwords == 2 the scrambled password will be binary.
           */
-          DBUG_ASSERT(thd->variables.old_passwords = 2);
+          assert(thd->variables.old_passwords == 2);
           str->append("<secret>");
         }
         str->append("'");
@@ -622,24 +629,12 @@ bool set_and_validate_user_attributes(THD *thd,
      Str->uses_authentication_string_clause)
   {
     st_mysql_auth *auth= (st_mysql_auth *) plugin_decl(plugin)->info;
-    /*
-      Validate hash string in following cases:
-        1. IDENTIFIED BY PASSWORD.
-        2. IDENTIFIED WITH .. AS 'auth_str' for ALTER USER statement
-           and its a replication slave thread
-    */
-    if (Str->uses_identified_by_password_clause ||
-        (Str->uses_authentication_string_clause &&
-        thd->lex->sql_command == SQLCOM_ALTER_USER &&
-        thd->slave_thread))
+    if (auth->validate_authentication_string((char*)Str->auth.str,
+                                             Str->auth.length))
     {
-      if (auth->validate_authentication_string((char*)Str->auth.str,
-                                               Str->auth.length))
-      {
-        my_error(ER_PASSWORD_FORMAT, MYF(0));
-        plugin_unlock(0, plugin);
-        return(1);
-      }
+      my_error(ER_PASSWORD_FORMAT, MYF(0));
+      plugin_unlock(0, plugin);
+      return(1);
     }
   }
   plugin_unlock(0, plugin);
@@ -685,12 +680,13 @@ bool change_password(THD *thd, const char *host, const char *user,
   size_t new_password_len= strlen(new_password);
   size_t escaped_hash_str_len= 0;
   bool result= true, rollback_whole_statement= false;
+  sql_mode_t old_sql_mode= thd->variables.sql_mode;
   int ret;
 
   DBUG_ENTER("change_password");
   DBUG_PRINT("enter",("host: '%s'  user: '%s'  new_password: '%s'",
                       host,user,new_password));
-  DBUG_ASSERT(host != 0);                        // Ensured by parent
+  assert(host != 0);                        // Ensured by parent
 
   if (check_change_password(thd, host, user, new_password, new_password_len))
     DBUG_RETURN(1);
@@ -737,7 +733,7 @@ bool change_password(THD *thd, const char *host, const char *user,
     goto end;
   }
 
-  DBUG_ASSERT(acl_user->plugin.length != 0);
+  assert(acl_user->plugin.length != 0);
   
   if (!(combo=(LEX_USER*) thd->alloc(sizeof(st_lex_user))))
     DBUG_RETURN(1);
@@ -769,15 +765,19 @@ bool change_password(THD *thd, const char *host, const char *user,
   thd->lex->alter_password.account_locked= false;
   thd->lex->alter_password.update_password_expired_fields= false;
 
+
   /*
-    When @@log-backward-compatible-user-definitions variable is ON
-    and its a slave thread, then the password is already hashed. So
-    do not generate another hash.
-  */
-  if (opt_log_builtin_as_identified_by_password &&
-      thd->slave_thread)
+    In case its a slave thread or a binlog applier thread, the password
+    is already hashed. Do not generate another hash!
+   */
+  if (thd->slave_thread || thd->is_binlog_applier())
+  {
+    /* Password is in hash form */
+    combo->uses_authentication_string_clause= true;
+    /* Password is not plain text */
     combo->uses_identified_by_clause= false;
-    
+  }
+
   if (set_and_validate_user_attributes(thd, combo, what_to_set,
                                        true, "SET PASSWORD"))
   {
@@ -786,7 +786,10 @@ bool change_password(THD *thd, const char *host, const char *user,
     goto end;
   }
 
-  ret= replace_user_table(thd, table, combo, 0, false, true, what_to_set);
+  thd->variables.sql_mode&= ~MODE_PAD_CHAR_TO_FULL_LENGTH;
+  ret= replace_user_table(thd, table, combo, 0, false, false, what_to_set);
+  thd->variables.sql_mode= old_sql_mode;
+
   if (ret)
   {
     mysql_mutex_unlock(&acl_cache->lock);
@@ -837,7 +840,7 @@ bool change_password(THD *thd, const char *host, const char *user,
 
     query_length= sprintf(buff, "SET PASSWORD FOR '%-.120s'@'%-.120s'='%s'",
                           acl_user->user ? acl_user->user : "",
-                          acl_user->host.get_host() ? acl_user->host.get_host() : "",
+                          acl_user->host.get_host(),
                           hash_str_escaped);
   }
   else
@@ -851,7 +854,7 @@ bool change_password(THD *thd, const char *host, const char *user,
 
     query_length= sprintf(buff, "ALTER USER '%-.120s'@'%-.120s' IDENTIFIED WITH '%-.120s' AS '%s'",
                           acl_user->user ? acl_user->user : "",
-                          acl_user->host.get_host() ? acl_user->host.get_host() : "",
+                          acl_user->host.get_host(),
                           acl_user->plugin.str,
                           hash_str_escaped);
   }
@@ -866,7 +869,7 @@ end:
     acl_notify_htons(thd, buff, query_length);
 
   /* Restore the state of binlog format */
-  DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+  assert(!thd->is_current_stmt_binlog_format_row());
   if (save_binlog_row_based)
     thd->set_current_stmt_binlog_format_row();
 
@@ -993,8 +996,6 @@ static int handle_grant_struct(enum enum_acl_lists struct_no, bool drop,
     }
     if (! user)
       user= "";
-    if (! host)
-      host= "";
 
 #ifdef EXTRA_DEBUG
     DBUG_PRINT("loop",("scan struct: %u  index: %zu  user: '%s'  host: '%s'",
@@ -1388,7 +1389,7 @@ bool mysql_create_user(THD *thd, List <LEX_USER> &list, bool if_not_exists)
   if ((result= open_grant_tables(thd, tables, &transactional_tables)))
   {
     /* Restore the state of binlog format */
-    DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+    assert(!thd->is_current_stmt_binlog_format_row());
     if (save_binlog_row_based)
       thd->set_current_stmt_binlog_format_row();
     DBUG_RETURN(result != 1);
@@ -1478,22 +1479,32 @@ bool mysql_create_user(THD *thd, List <LEX_USER> &list, bool if_not_exists)
 
   if (some_users_created || (if_not_exists && !thd->is_error()))
   {
-    String *rlb= &thd->rewritten_query;
-    rlb->mem_free();
-    mysql_rewrite_create_alter_user(thd, rlb, &extra_users);
+    /*
+      Rewrite CREATE USER statements to use password hashes instead
+      of <secret> style obfuscation so it can be used in binlog. We
+      are rewriting to a private string rather than the public one on
+      the THD (thd->m_rewritten_query). This will save us from having
+      to acquire the lock to update the string on the THD. As
+      slow-logging (if enabled) will happen later and use the string
+      on the THD, the slow log will not contain the local rewrite
+      we're doing here, but the original one.
+    */
+    String rlb;
+
+    mysql_rewrite_create_alter_user(thd, &rlb, &extra_users);
 
     int ret= commit_owned_gtid_by_partial_command(thd);
 
     if (ret == 1)
     {
-      if (!thd->rewritten_query.length())
+      if (!rlb.length())
         result|= write_bin_log(thd, false, thd->query().str, thd->query().length,
                                transactional_tables);
-      else
-        result|= write_bin_log(thd, false,
-                               thd->rewritten_query.c_ptr_safe(),
-                               thd->rewritten_query.length(),
+      else {
+        result|= write_bin_log(thd, false, rlb.c_ptr_safe(), rlb.length(),
                                transactional_tables);
+        thd->swap_rewritten_query(rlb); // must come last!
+      }
     }
     else if (ret == -1)
       result|= -1;
@@ -1509,7 +1520,7 @@ bool mysql_create_user(THD *thd, List <LEX_USER> &list, bool if_not_exists)
     acl_notify_htons(thd, thd->query().str, thd->query().length);
 
   /* Restore the state of binlog format */
-  DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+  assert(!thd->is_current_stmt_binlog_format_row());
   if (save_binlog_row_based)
     thd->set_current_stmt_binlog_format_row();
   DBUG_RETURN(result);
@@ -1555,7 +1566,7 @@ bool mysql_drop_user(THD *thd, List <LEX_USER> &list, bool if_exists)
   if ((result= open_grant_tables(thd, tables, &transactional_tables)))
   {
     /* Restore the state of binlog format */
-    DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+    assert(!thd->is_current_stmt_binlog_format_row());
     if (save_binlog_row_based)
       thd->set_current_stmt_binlog_format_row();
     DBUG_RETURN(result != 1);
@@ -1631,7 +1642,7 @@ bool mysql_drop_user(THD *thd, List <LEX_USER> &list, bool if_exists)
 
   thd->variables.sql_mode= old_sql_mode;
   /* Restore the state of binlog format */
-  DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+  assert(!thd->is_current_stmt_binlog_format_row());
   if (save_binlog_row_based)
     thd->set_current_stmt_binlog_format_row();
   DBUG_RETURN(result);
@@ -1677,7 +1688,7 @@ bool mysql_rename_user(THD *thd, List <LEX_USER> &list)
   if ((result= open_grant_tables(thd, tables, &transactional_tables)))
   {
     /* Restore the state of binlog format */
-    DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+    assert(!thd->is_current_stmt_binlog_format_row());
     if (save_binlog_row_based)
       thd->set_current_stmt_binlog_format_row();
     DBUG_RETURN(result != 1);
@@ -1699,7 +1710,7 @@ bool mysql_rename_user(THD *thd, List <LEX_USER> &list)
       result= TRUE;
       continue;
     }  
-    DBUG_ASSERT(user_to != 0); /* Syntax enforces pairs of users. */
+    assert(user_to != 0); /* Syntax enforces pairs of users. */
 
     /*
       Search all in-memory structures and grant tables
@@ -1769,7 +1780,7 @@ bool mysql_rename_user(THD *thd, List <LEX_USER> &list)
     acl_notify_htons(thd, thd->query().str, thd->query().length);
 
   /* Restore the state of binlog format */
-  DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+  assert(!thd->is_current_stmt_binlog_format_row());
   if (save_binlog_row_based)
     thd->set_current_stmt_binlog_format_row();
   DBUG_RETURN(result);
@@ -1803,6 +1814,7 @@ bool mysql_alter_user(THD *thd, List <LEX_USER> &list, bool if_exists)
   bool is_privileged_user= false;
   bool rollback_whole_statement= false;
   std::set<LEX_USER *> extra_users;
+  std::set<LEX_USER *> reset_users;
   Acl_table_intact table_intact;
 
   DBUG_ENTER("mysql_alter_user");
@@ -1930,7 +1942,7 @@ bool mysql_alter_user(THD *thd, List <LEX_USER> &list, bool if_exists)
     }
 
     /* update the mysql.user table */
-    int ret= replace_user_table(thd, table, user_from, 0, false, true,
+    int ret= replace_user_table(thd, table, user_from, 0, false, false,
                                 what_to_alter);
     if (ret)
     {
@@ -1944,6 +1956,8 @@ bool mysql_alter_user(THD *thd, List <LEX_USER> &list, bool if_exists)
                   false);
       continue;
     }
+    if (what_to_alter & RESOURCE_ATTR)
+      reset_users.insert(tmp_user_from);
     some_user_altered= true;
     update_sctx_cache(thd->security_context(), acl_user,
                       user_from->alter_status.update_password_expired_column);
@@ -1962,20 +1976,29 @@ bool mysql_alter_user(THD *thd, List <LEX_USER> &list, bool if_exists)
 
   if (some_user_altered || (if_exists && !thd->is_error()))
   {
-    /* do query rewrite for ALTER USER */
-    String *rlb= &thd->rewritten_query;
-    rlb->mem_free();
-    mysql_rewrite_create_alter_user(thd, rlb, &extra_users);
+    /*
+      Rewrite ALTER USER statements to use password hashes instead
+      of <secret> style obfuscation so it can be used in binlog. We
+      are rewriting to a private string rather than the public one on
+      the THD (thd->m_rewritten_query). This will save us from having
+      to acquire the lock to update the string on the THD. As
+      slow-logging (if enabled) will happen later and use the string
+      on the THD, the slow log will not contain the local rewrite
+      we're doing here, but the original one.
+    */
+    String rlb;
+
+    mysql_rewrite_create_alter_user(thd, &rlb, &extra_users);
 
     int ret= commit_owned_gtid_by_partial_command(thd);
     if (ret == 1)
-      result|= (write_bin_log(thd, false,
-                              thd->rewritten_query.c_ptr_safe(),
-                              thd->rewritten_query.length(),
+      result|= (write_bin_log(thd, false, rlb.c_ptr_safe(), rlb.length(),
                               table->file->has_transactions()) != 0);
 
     else if (ret == -1)
       result|= -1;
+
+    thd->swap_rewritten_query(rlb); // must come last!
   }
 
   lock.unlock();
@@ -1986,10 +2009,20 @@ bool mysql_alter_user(THD *thd, List <LEX_USER> &list, bool if_exists)
                                    rollback_whole_statement);
 
   if (some_user_altered && !result)
+  {
+    std::set<LEX_USER *>::iterator one_user;
+    LEX_USER *ext_user;
+    for (one_user= reset_users.begin(); one_user != reset_users.end(); one_user++)
+    {
+      LEX_USER *user= *one_user;
+      if ((ext_user= get_current_user(thd, user)))
+        reset_mqh(ext_user, false);
+    }
     acl_notify_htons(thd, thd->query().str, thd->query().length);
+  }
 
   /* Restore the state of binlog format */
-  DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+  assert(!thd->is_current_stmt_binlog_format_row());
   if (save_binlog_row_based)
     thd->set_current_stmt_binlog_format_row();
   DBUG_RETURN(result);
@@ -1997,5 +2030,3 @@ bool mysql_alter_user(THD *thd, List <LEX_USER> &list, bool if_exists)
 
 
 #endif
-
-

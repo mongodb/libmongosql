@@ -1,13 +1,25 @@
-/* Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
+
+   Without limiting anything contained in the foregoing, this file,
+   which is part of C Driver for MySQL (Connector/C), is also subject to the
+   Universal FOSS Exception, version 1.0, a copy of which can be found at
+   http://oss.oracle.com/licenses/universal-foss-exception.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -21074,7 +21086,7 @@ uint gb18030_chs_to_code(const uchar *src, size_t srclen)
 {
   uint r= 0;
 
-  DBUG_ASSERT(srclen == 1 || srclen == 2 || srclen == 4);
+  assert(srclen == 1 || srclen == 2 || srclen == 4);
 
   switch (srclen)
   {
@@ -21088,7 +21100,7 @@ uint gb18030_chs_to_code(const uchar *src, size_t srclen)
       r= (src[0] << 24) + (src[1] << 16) + (src[2] << 8) + src[3];
       break;
     default:
-      DBUG_ASSERT(0);
+      assert(0);
   }
 
   return r;
@@ -21112,7 +21124,7 @@ code_to_gb18030_chs(uchar *dst, size_t dstlen, uint code)
   for (i= 0; code != 0; i++, code>>= 8)
     r[i]= (uchar) (code & 0xFF);
 
-  DBUG_ASSERT(i == 1 || i == 2 || i == 4);
+  assert(i == 1 || i == 2 || i == 4);
   for (; i > 0 && dst < dst_end; --i, ++len)
     *dst++= r[i - 1];
 
@@ -21132,7 +21144,7 @@ code_to_gb18030_chs(uchar *dst, size_t dstlen, uint code)
 static uint
 diff_to_gb18030_4(uchar *dst, uint dstlen, uint diff)
 {
-  DBUG_ASSERT(dstlen >= 4);
+  assert(dstlen >= 4);
 
   if (diff > MAX_GB18030_DIFF || dstlen < 4)
     return 0;
@@ -21158,16 +21170,16 @@ gb18030_4_code_to_diff(uint code)
 {
   uint diff= 0;
 
-  DBUG_ASSERT(is_mb_odd((code >> 24) & 0xFF));
+  assert(is_mb_odd((code >> 24) & 0xFF));
   diff+= ((code >> 24) & 0xFF) - MIN_MB_ODD_BYTE;
   diff*= 10;
-  DBUG_ASSERT(is_mb_even_4((code >> 16) & 0xFF));
+  assert(is_mb_even_4((code >> 16) & 0xFF));
   diff+= ((code >> 16) & 0xFF) - MIN_MB_EVEN_BYTE_4;
   diff*= 126;
-  DBUG_ASSERT(is_mb_odd((code >> 8) & 0xFF));
+  assert(is_mb_odd((code >> 8) & 0xFF));
   diff+= ((code >> 8) & 0xFF) - MIN_MB_ODD_BYTE;
   diff*= 10;
-  DBUG_ASSERT(is_mb_even_4(code & 0xFF));
+  assert(is_mb_even_4(code & 0xFF));
   diff+= (code & 0xFF) - MIN_MB_EVEN_BYTE_4;
 
   return diff;
@@ -21202,7 +21214,7 @@ static uint
 my_ismbchar_gb18030(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
                     const char *p, const char *e)
 {
-  DBUG_ASSERT(e > p);
+  assert(e > p);
 
   if (e - p <= 1 || !is_mb_odd(p[0]))
     return 0;
@@ -21349,12 +21361,12 @@ my_wc_mb_gb18030_chs(const CHARSET_INFO *cs  MY_ATTRIBUTE((unused)),
         return MY_CS_TOOSMALL4;
 
       err= diff_to_gb18030_4(s, 4, idx);
-      DBUG_ASSERT(err != 0);
+      assert(err != 0);
 
       return err != 0 ? len : MY_CS_ILUNI;
   }
 
-  DBUG_ASSERT(0);
+  assert(0);
   return MY_CS_ILUNI;
 }
 
@@ -21451,7 +21463,7 @@ my_mb_wc_gb18030(const CHARSET_INFO *cs MY_ATTRIBUTE((unused)),
       /* (GB+8431A439, GB+90308130) and (GB+E3329A35, GB+FE39FE39) */
       cp= 0x003F;
     else
-      DBUG_ASSERT(0);
+      assert(0);
 
     *pwc= cp;
     return 4;
@@ -21512,7 +21524,7 @@ get_case_info(const CHARSET_INFO *cs, const uchar *src, size_t srclen)
 {
   const MY_UNICASE_CHARACTER *p= NULL;
 
-  DBUG_ASSERT(cs != NULL);
+  assert(cs != NULL);
 
   switch (srclen)
   {
@@ -21541,7 +21553,7 @@ get_case_info(const CHARSET_INFO *cs, const uchar *src, size_t srclen)
       return p ? &p[code & 0xFF] : NULL;
   }
 
-  DBUG_ASSERT(0);
+  assert(0);
   return NULL;
 }
 
@@ -21568,10 +21580,10 @@ case_info_code_to_gb18030(uint code)
              code <= (MAX_3_BYTE_FROM_UNI & 0xFFFF))
       code+= (MIN_3_BYTE_FROM_UNI & 0xFF0000);
     else
-      DBUG_ASSERT(0);
+      assert(0);
 
     r= diff_to_gb18030_4(gbchs, 4, code);
-    DBUG_ASSERT(r == 4);
+    assert(r == 4);
 
     return r == 4 ? gb18030_chs_to_code(gbchs, 4) : 0;
   }
@@ -21594,7 +21606,7 @@ get_casefolded_code(const CHARSET_INFO *cs, const uchar *src,
 {
   const MY_UNICASE_CHARACTER *ch= get_case_info(cs, src, srclen);
 
-  DBUG_ASSERT(srclen == 1 || srclen == 2 || srclen == 4);
+  assert(srclen == 1 || srclen == 2 || srclen == 4);
 
   return ch ? case_info_code_to_gb18030(is_upper ? ch->toupper : ch->tolower) :
          0;
@@ -21627,7 +21639,7 @@ my_casefold_gb18030(const CHARSET_INFO *cs, char *src, size_t srclen,
   {
     uint mblen= my_ismbchar_gb18030(cs, src, srcend);
 
-    DBUG_ASSERT(dst < dst_end);
+    assert(dst < dst_end);
     if (mblen)
     {
       uint code= get_casefolded_code(cs, (uchar *) src, mblen, is_upper);
@@ -21637,14 +21649,14 @@ my_casefold_gb18030(const CHARSET_INFO *cs, char *src, size_t srclen,
         size_t mblen_dst= code_to_gb18030_chs((uchar *) dst, dst_end - dst,
                                               code);
 
-        DBUG_ASSERT(dst + mblen_dst <= dst_end);
+        assert(dst + mblen_dst <= dst_end);
         src+= mblen;
         dst+= mblen_dst;
       }
       else
       {
-        DBUG_ASSERT(mblen == 2 || mblen == 4);
-        DBUG_ASSERT(dst + mblen <= dst_end);
+        assert(mblen == 2 || mblen == 4);
+        assert(dst + mblen <= dst_end);
 
         if (mblen == 4)
         {
@@ -21677,9 +21689,9 @@ static size_t
 my_casedn_gb18030(const CHARSET_INFO *cs, char *src, size_t srclen,
                   char *dst, size_t dstlen)
 {
-  DBUG_ASSERT(cs != NULL);
-  DBUG_ASSERT(src != dst || cs->casedn_multiply == 1);
-  DBUG_ASSERT(dstlen >= srclen * cs->casedn_multiply);
+  assert(cs != NULL);
+  assert(src != dst || cs->casedn_multiply == 1);
+  assert(dstlen >= srclen * cs->casedn_multiply);
   return my_casefold_gb18030(cs, src, srclen, dst, dstlen, cs->to_lower, 0);
 }
 
@@ -21697,9 +21709,9 @@ static size_t
 my_caseup_gb18030(const CHARSET_INFO *cs, char *src, size_t srclen,
                   char *dst, size_t dstlen)
 {
-  DBUG_ASSERT(cs != NULL);
-  DBUG_ASSERT(src != dst || cs->caseup_multiply == 1);
-  DBUG_ASSERT(dstlen >= srclen * cs->caseup_multiply);
+  assert(cs != NULL);
+  assert(src != dst || cs->caseup_multiply == 1);
+  assert(dstlen >= srclen * cs->caseup_multiply);
   return my_casefold_gb18030(cs, src, srclen, dst, dstlen, cs->to_upper, 1);
 }
 
@@ -21723,9 +21735,9 @@ my_casedn_gb18030_uca(const CHARSET_INFO *cs, char *src, size_t srclen,
   int srcres, dstres;
   char *srcend= src + srclen, *dstend= dst + dstlen, *dst0= dst;
 
-  DBUG_ASSERT(cs != NULL);
-  DBUG_ASSERT(src != dst || cs->casedn_multiply == 1);
-  DBUG_ASSERT(dstlen >= srclen * cs->casedn_multiply);
+  assert(cs != NULL);
+  assert(src != dst || cs->casedn_multiply == 1);
+  assert(dstlen >= srclen * cs->casedn_multiply);
 
   uni_plane= cs->caseinfo;
 
@@ -21771,9 +21783,9 @@ my_caseup_gb18030_uca(const CHARSET_INFO *cs, char *src, size_t srclen,
   int srcres, dstres;
   char *srcend= src + srclen, *dstend= dst + dstlen, *dst0= dst;
 
-  DBUG_ASSERT(cs != NULL);
-  DBUG_ASSERT(src != dst || cs->caseup_multiply == 1);
-  DBUG_ASSERT(dstlen >= srclen * cs->caseup_multiply);
+  assert(cs != NULL);
+  assert(src != dst || cs->caseup_multiply == 1);
+  assert(dstlen >= srclen * cs->caseup_multiply);
 
   uni_plane= cs->caseinfo;
 
@@ -21876,7 +21888,7 @@ get_weight_for_mbchar(const CHARSET_INFO *cs, const uchar *src, size_t mblen)
 {
   uint weight, caseup_code, code= gb18030_chs_to_code(src, mblen);
 
-  DBUG_ASSERT(mblen == 2 || mblen == 4);
+  assert(mblen == 2 || mblen == 4);
 
   /* Make sure the max 4-byte gb18030 code has the max weight */
   if (code == 0xFE39FE39)
@@ -21908,11 +21920,11 @@ get_weight_for_mbchar(const CHARSET_INFO *cs, const uchar *src, size_t mblen)
 static uint
 get_weight_for_gb18030_chs(const CHARSET_INFO *cs, const char *s, size_t s_len)
 {
-  DBUG_ASSERT(s_len == 1 || s_len == 2 || s_len == 4);
+  assert(s_len == 1 || s_len == 2 || s_len == 4);
 
   if (s_len == 1)
   {
-    DBUG_ASSERT(is_mb_1(*s));
+    assert(is_mb_1(*s));
     return cs->sort_order[(uchar) *s];
   }
 
@@ -21947,7 +21959,7 @@ get_code_and_length(const CHARSET_INFO *cs, const char *s,
   if ((len= my_ismbchar_gb18030(cs, s, e)) == 0)
     return 0;
 
-  DBUG_ASSERT(len == 2 || len == 4);
+  assert(len == 2 || len == 4);
   *code= gb18030_chs_to_code((const uchar *) s, len);
   return len;
 }
@@ -21977,7 +21989,7 @@ my_strnncoll_gb18030_internal(const CHARSET_INFO *cs,
   const uchar *se= s + s_length;
   const uchar *te= t + t_length;
 
-  DBUG_ASSERT(cs != NULL);
+  assert(cs != NULL);
 
   while (s < se && t < te)
   {
@@ -22118,7 +22130,7 @@ my_strnxfrm_gb18030(const CHARSET_INFO *cs,
   const uchar *se= src + srclen;
   const uchar *sort_order;
 
-  DBUG_ASSERT(cs != NULL);
+  assert(cs != NULL);
   sort_order= cs->sort_order;
 
   for (; dst < de && src < se && nweights; nweights--)
@@ -22176,11 +22188,11 @@ unicode_to_gb18030_code(const CHARSET_INFO *cs, int unicode)
   uint dst_len;
   int res;
 
-  DBUG_ASSERT(cs != NULL);
+  assert(cs != NULL);
 
   res= cs->cset->wc_mb(cs, unicode, dst, dst + 4);
 
-  DBUG_ASSERT(res == 1 || res == 2 || res == 4);
+  assert(res == 1 || res == 2 || res == 4);
 
   dst_len= (uint) res;
   return gb18030_chs_to_code(dst, dst_len);
