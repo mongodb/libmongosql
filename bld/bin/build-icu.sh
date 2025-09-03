@@ -57,10 +57,11 @@ windows-64)
         exit 1
     fi
 
-    echo "Running \"$VCVARSALL_PATH\" amd64 && bash -c \"cd $ICU_BUILD_DIR && eval \"$CONFIGURE\"\""
-    cmd /c "\"$VCVARSALL_PATH\" amd64 && bash -c \"cd $ICU_BUILD_DIR && eval \"$CONFIGURE\"\""
+    VCVARSALL_CYGPATH=$(cygpath -m "$VCVARSALL_PATH")
+    echo "Running \"$VCVARSALL_PATH\" amd64 && bash -c 'cd $ICU_BUILD_DIR ^&^& eval $CONFIGURE'"
+    cmd /c "$VCVARSALL_CYGPATH" amd64 && bash -c 'cd $ICU_BUILD_DIR ^&^& eval $CONFIGURE'
     fail_on_error $? configure
-    cmd /c "\"$VCVARSALL_PATH\" amd64 && bash -c \"cd $ICU_BUILD_DIR && make\""
+    cmd /c "$VCVARSALL_PATH" amd64 && bash -c \"cd $ICU_BUILD_DIR && make\""
     fail_on_error $? make
     ;;
 windows-32)
