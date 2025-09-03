@@ -1,13 +1,25 @@
-/* Copyright (c) 2002, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2002, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
+
+   Without limiting anything contained in the foregoing, this file,
+   which is part of C Driver for MySQL (Connector/C), is also subject to the
+   Universal FOSS Exception, version 1.0, a copy of which can be found at
+   http://oss.oracle.com/licenses/universal-foss-exception.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -214,8 +226,8 @@ int my_handle_options(int *argc, char ***argv,
   bool opt_found;
 
   /* handle_options() assumes arg0 (program name) always exists */
-  DBUG_ASSERT(argc && *argc >= 1);
-  DBUG_ASSERT(argv && *argv);
+  assert(argc && *argc >= 1);
+  assert(argv && *argv);
   (*argc)--; /* Skip the program name */
   (*argv)++; /*      --- || ----      */
   init_variables(longopts, init_one_value);
@@ -539,10 +551,10 @@ int my_handle_options(int *argc, char ***argv,
                 Hack the string "-XYZ" to make a "-YZ" substring in it,
                 and push that to the output as an unrecognized parameter.
               */
-              DBUG_ASSERT(optend > *pos);
-              DBUG_ASSERT(optend >= cur_arg);
-              DBUG_ASSERT(optend <= *pos + strlen(*pos));
-              DBUG_ASSERT(*optend);
+              assert(optend > *pos);
+              assert(optend >= cur_arg);
+              assert(optend <= *pos + strlen(*pos));
+              assert(*optend);
               optend--;
               optend[0]= '-'; /* replace 'X' or '-' by '-' */
               (*argv)[argvpos++]= optend;
@@ -1060,7 +1072,7 @@ ulonglong max_of_int_range(int var_type)
   case GET_ULL:
     return ULLONG_MAX;
   default:
-    DBUG_ASSERT(0);
+    assert(0);
     return 0;
   }
 }

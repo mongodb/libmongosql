@@ -1,13 +1,20 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -69,9 +76,9 @@ public:
     DBUG_PRINT("enter", ("ht: 0x%llx (%s)",
                          (ulonglong) ht_arg,
                          ha_legacy_type_name(ht_arg->db_type)));
-    DBUG_ASSERT(m_flags == 0);
-    DBUG_ASSERT(m_ht == NULL);
-    DBUG_ASSERT(m_next == NULL);
+    assert(m_flags == 0);
+    assert(m_ht == NULL);
+    assert(m_next == NULL);
 
     m_ht= ht_arg;
     m_flags= (int) TRX_READ_ONLY; /* Assume read-only at start. */
@@ -101,14 +108,33 @@ public:
 
   void set_trx_read_write()
   {
-    DBUG_ASSERT(is_started());
+    assert(is_started());
     m_flags|= (int) TRX_READ_WRITE;
   }
 
   bool is_trx_read_write() const
   {
-    DBUG_ASSERT(is_started());
+    assert(is_started());
     return m_flags & (int) TRX_READ_WRITE;
+  }
+
+  /**
+    Set the transaction flag to noop_read_write
+    If the transaction has no operation dml statement.
+  */
+  void set_trx_noop_read_write()
+  {
+    assert(is_started());
+    m_flags|= (int) TRX_NOOP_READ_WRITE;
+  }
+
+  /**
+    Check if the stmt transaction has noop_read_write flag set.
+  */
+  bool is_trx_noop_read_write() const
+  {
+    assert(is_started());
+    return m_flags & (int) TRX_NOOP_READ_WRITE;
   }
 
   bool is_started() const
@@ -128,25 +154,27 @@ public:
       Can be called many times, e.g. when we have many
       read-write statements in a transaction.
     */
-    DBUG_ASSERT(is_started());
+    assert(is_started());
     if (stmt_trx->is_trx_read_write())
       set_trx_read_write();
+    if (stmt_trx->is_trx_noop_read_write())
+      set_trx_noop_read_write();
   }
 
   Ha_trx_info *next() const
   {
-    DBUG_ASSERT(is_started());
+    assert(is_started());
     return m_next;
   }
 
   handlerton *ht() const
   {
-    DBUG_ASSERT(is_started());
+    assert(is_started());
     return m_ht;
   }
 
 private:
-  enum { TRX_READ_ONLY= 0, TRX_READ_WRITE= 1 };
+  enum { TRX_READ_ONLY= 0, TRX_READ_WRITE= 1, TRX_NOOP_READ_WRITE= 2 };
   /**
     Auxiliary, used for ha_list management
   */
@@ -337,7 +365,7 @@ public:
     bool real_commit;               // Is this a "real" commit?
     bool commit_low;                // see MYSQL_BIN_LOG::ordered_commit
     bool run_hooks;                 // Call the after_commit hook
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     bool ready_preempt;             // internal in MYSQL_BIN_LOG::ordered_commit
 #endif
   } m_flags;
@@ -383,7 +411,7 @@ public:
     m_savepoints= NULL;
     m_xid_state.cleanup();
     m_rpl_transaction_ctx.cleanup();
-    m_transaction_write_set_ctx.clear_write_set();
+    m_transaction_write_set_ctx.reset_state();
     free_root(&m_mem_root,MYF(MY_KEEP_PREALLOC));
     DBUG_VOID_RETURN;
   }

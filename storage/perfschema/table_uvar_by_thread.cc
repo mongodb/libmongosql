@@ -1,13 +1,20 @@
-/* Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2013, 2023, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; version 2 of the License.
+  it under the terms of the GNU General Public License, version 2.0,
+  as published by the Free Software Foundation.
+
+  This program is also distributed with certain software (including
+  but not limited to OpenSSL) that is licensed under separate terms,
+  as designated in a particular file or component or in included license
+  documentation.  The authors of MySQL hereby grant you an additional
+  permission to link the program and your derivative works with the
+  separately licensed software that they have included with MySQL.
 
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  GNU General Public License, version 2.0, for more details.
 
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software
@@ -98,7 +105,7 @@ void User_variables::materialize(PFS_thread *pfs, THD *thd)
     /* Copy VARIABLE_NAME */
     const char *name= sql_uvar->entry_name.ptr();
     size_t name_length= sql_uvar->entry_name.length();
-    DBUG_ASSERT(name_length <= sizeof(pfs_uvar.m_name));
+    assert(name_length <= sizeof(pfs_uvar.m_name));
     pfs_uvar.m_name.make_row(name, name_length);
 
     /* Copy VARIABLE_VALUE */
@@ -145,6 +152,11 @@ TABLE_FIELD_DEF
 table_uvar_by_thread::m_field_def=
 { 3, field_types };
 
+PFS_engine_table_share_state
+table_uvar_by_thread::m_share_state = {
+  false /* m_checked */
+};
+
 PFS_engine_table_share
 table_uvar_by_thread::m_share=
 {
@@ -157,8 +169,9 @@ table_uvar_by_thread::m_share=
   sizeof(pos_t),
   &m_table_lock,
   &m_field_def,
-  false, /* checked */
-  false  /* perpetual */
+  false, /* m_perpetual */
+  false, /* m_optional */
+  &m_share_state
 };
 
 PFS_engine_table*
@@ -300,11 +313,11 @@ int table_uvar_by_thread
     return HA_ERR_RECORD_DELETED;
 
   /* Set the null bits */
-  DBUG_ASSERT(table->s->null_bytes == 1);
+  assert(table->s->null_bytes == 1);
   buf[0]= 0;
 
-  DBUG_ASSERT(m_row.m_variable_name != NULL);
-  DBUG_ASSERT(m_row.m_variable_value != NULL);
+  assert(m_row.m_variable_name != NULL);
+  assert(m_row.m_variable_value != NULL);
 
   for (; (f= *fields) ; fields++)
   {
@@ -333,7 +346,7 @@ int table_uvar_by_thread
         }
         break;
       default:
-        DBUG_ASSERT(false);
+        assert(false);
       }
     }
   }

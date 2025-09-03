@@ -2,17 +2,23 @@
 #define PARTITION_HANDLER_INCLUDED
 
 /*
-   Copyright (c) 2005, 2017, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2005, 2023, Oracle and/or its affiliates.
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-   GNU General Public License for more details.
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -131,13 +137,13 @@ public:
   /** lock mutex protecting auto increment value next_auto_inc_val. */
   inline void lock_auto_inc()
   {
-    DBUG_ASSERT(auto_inc_mutex);
+    assert(auto_inc_mutex);
     mysql_mutex_lock(auto_inc_mutex);
   }
   /** unlock mutex protecting auto increment value next_auto_inc_val. */
   inline void unlock_auto_inc()
   {
-    DBUG_ASSERT(auto_inc_mutex);
+    assert(auto_inc_mutex);
     mysql_mutex_unlock(auto_inc_mutex);
   }
   /**
@@ -272,8 +278,8 @@ public:
     {
       return HA_ERR_WRONG_COMMAND;
     }
-    DBUG_ASSERT(file->table_share->tmp_table != NO_TMP_TABLE ||
-                file->m_lock_type == F_WRLCK);
+    assert(file->table_share->tmp_table != NO_TMP_TABLE ||
+           file->m_lock_type == F_WRLCK);
     file->mark_trx_read_write();
     return truncate_partition_low();
   }
@@ -305,8 +311,8 @@ public:
       my_error(ER_ILLEGAL_HA, MYF(0), create_info->alias);
       return HA_ERR_WRONG_COMMAND;
     }
-    DBUG_ASSERT(file->table_share->tmp_table != NO_TMP_TABLE ||
-                file->m_lock_type != F_UNLCK);
+    assert(file->table_share->tmp_table != NO_TMP_TABLE ||
+           file->m_lock_type != F_UNLCK);
     file->mark_trx_read_write();
     return change_partitions_low(create_info, path, copied, deleted);
   }
@@ -321,6 +327,15 @@ public:
   */
   virtual uint alter_flags(uint flags) const
   { return 0; }
+
+  /**
+    Get partition row type from SE
+    @param       part_id    Id of partition for which row type to be retrieved
+    @return      Partition row type.
+  */
+  virtual enum row_type get_partition_row_type(uint part_id) {
+    return ROW_TYPE_NOT_USED;
+  }
 
 private:
   /**
@@ -440,7 +455,7 @@ public:
   */
   inline bool init_partitioning(MEM_ROOT *mem_root)
   {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     m_key_not_found_partitions.bitmap= NULL;
 #endif
     return false;
@@ -701,7 +716,7 @@ protected:
     /* lock already taken */
     if (m_auto_increment_safe_stmt_log_lock)
       return;
-    DBUG_ASSERT(!m_auto_increment_lock);
+    assert(!m_auto_increment_lock);
     if(m_table->s->tmp_table == NO_TMP_TABLE)
     {
       m_auto_increment_lock= true;
@@ -899,11 +914,11 @@ private:
   virtual void position_in_last_part(uchar *ref, const uchar *row) = 0;
   /* If ph_rnd_pos is used then this needs to be implemented! */
   virtual int rnd_pos_in_part(uint part_id, uchar *buf, uchar *pos)
-  { DBUG_ASSERT(0); return HA_ERR_WRONG_COMMAND; }
+  { assert(0); return HA_ERR_WRONG_COMMAND; }
   virtual int index_init_in_part(uint part, uint keynr, bool sorted)
-  { DBUG_ASSERT(0); return HA_ERR_WRONG_COMMAND; }
+  { assert(0); return HA_ERR_WRONG_COMMAND; }
   virtual int index_end_in_part(uint part)
-  { DBUG_ASSERT(0); return HA_ERR_WRONG_COMMAND; }
+  { assert(0); return HA_ERR_WRONG_COMMAND; }
   virtual int index_first_in_part(uint part, uchar *buf) = 0;
   virtual int index_last_in_part(uint part, uchar *buf) = 0;
   virtual int index_prev_in_part(uint part, uchar *buf) = 0;
@@ -968,7 +983,7 @@ private:
     @param part_id  Partition to checksum.
   */
   virtual ha_checksum checksum_in_part(uint part_id) const
-  { DBUG_ASSERT(0); return 0; }
+  { assert(0); return 0; }
   /**
     Copy a cached row.
 

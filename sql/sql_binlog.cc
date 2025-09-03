@@ -1,14 +1,21 @@
 /*
-   Copyright (c) 2005, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2005, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -40,7 +47,7 @@ static int check_event_type(int type, Relay_log_info *rli)
   */
   if (fd_event && fd_event->event_type_permutation)
   {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     Log_event_type new_type;
     new_type= (Log_event_type) fd_event->event_type_permutation[type];
     DBUG_PRINT("info", ("converting event type %d to %d (%s)",
@@ -179,7 +186,7 @@ void mysql_client_binlog_statement(THD* thd)
     goto end;
   }
 
-  DBUG_ASSERT(rli->belongs_to_client());
+  assert(rli->belongs_to_client());
 
   for (char const *strptr= thd->lex->comment.str ;
        strptr < thd->lex->comment.str + thd->lex->comment.length ; )
@@ -201,8 +208,8 @@ void mysql_client_binlog_statement(THD* thd)
     else if (bytes_decoded == 0)
       break; // If no bytes where read, the string contained only whitespace
 
-    DBUG_ASSERT(bytes_decoded > 0);
-    DBUG_ASSERT(endptr > strptr);
+    assert(bytes_decoded > 0);
+    assert(endptr > strptr);
     coded_len-= endptr - strptr;
     strptr= endptr;
 

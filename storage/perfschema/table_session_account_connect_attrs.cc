@@ -1,13 +1,20 @@
-/* Copyright (c) 2008, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2008, 2023, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; version 2 of the License.
+  it under the terms of the GNU General Public License, version 2.0,
+  as published by the Free Software Foundation.
+
+  This program is also distributed with certain software (including
+  but not limited to OpenSSL) that is licensed under separate terms,
+  as designated in a particular file or component or in included license
+  documentation.  The authors of MySQL hereby grant you an additional
+  permission to link the program and your derivative works with the
+  separately licensed software that they have included with MySQL.
 
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  GNU General Public License, version 2.0, for more details.
 
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software Foundation,
@@ -16,6 +23,11 @@
 #include "table_session_account_connect_attrs.h"
 
 THR_LOCK table_session_account_connect_attrs::m_table_lock;
+
+PFS_engine_table_share_state
+table_session_account_connect_attrs::m_share_state = {
+  false /* m_checked */
+};
 
 PFS_engine_table_share
 table_session_account_connect_attrs::m_share=
@@ -29,8 +41,9 @@ table_session_account_connect_attrs::m_share=
   sizeof(pos_connect_attr_by_thread_by_attr), /* ref length */
   &m_table_lock,
   &m_field_def,
-  false, /* checked */
-  false  /* perpetual */
+  false, /* m_perpetual */
+  false, /* m_optional */
+  &m_share_state
 };
 
 PFS_engine_table* table_session_account_connect_attrs::create()
@@ -51,7 +64,7 @@ table_session_account_connect_attrs::thread_fits(PFS_thread *thread)
     return false;
 
   /* The thread we compare to, by definition, has some instrumentation. */
-  DBUG_ASSERT(thread != NULL);
+  assert(thread != NULL);
 
   uint username_length= current_thread->m_username_length;
   uint hostname_length= current_thread->m_hostname_length;

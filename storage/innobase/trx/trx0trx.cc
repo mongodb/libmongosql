@@ -1,14 +1,22 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2018, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2023, Oracle and/or its affiliates.
 
-This program is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation; version 2 of the License.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License, version 2.0,
+as published by the Free Software Foundation.
 
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is also distributed with certain software (including
+but not limited to OpenSSL) that is licensed under separate terms,
+as designated in a particular file or component or in included license
+documentation.  The authors of MySQL hereby grant you an additional
+permission to link the program and your derivative works with the
+separately licensed software that they have included with MySQL.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License, version 2.0, for more details.
 
 You should have received a copy of the GNU General Public License along with
 this program; if not, write to the Free Software Foundation, Inc.,
@@ -184,6 +192,7 @@ trx_init(
 	trx->lock.rec_cached = 0;
 
 	trx->lock.table_cached = 0;
+	trx->error_index = NULL;
 
 	/* During asynchronous rollback, we should reset forced rollback flag
 	only after rollback is complete to avoid race with the thread owning
@@ -1983,13 +1992,6 @@ trx_commit_in_memory(
 		}
 	}
 
-	if (trx->rsegs.m_redo.rseg != NULL) {
-		trx_rseg_t*	rseg = trx->rsegs.m_redo.rseg;
-		mutex_enter(&rseg->mutex);
-		ut_ad(rseg->trx_ref_count > 0);
-		--rseg->trx_ref_count;
-		mutex_exit(&rseg->mutex);
-	}
 
 	if (mtr != NULL) {
 		if (trx->rsegs.m_redo.insert_undo != NULL) {
@@ -2050,6 +2052,24 @@ trx_commit_in_memory(
 		master thread, purge thread or page_cleaner thread might
 		have some work to do. */
 		srv_active_wake_master_thread();
+	}
+
+	/* Do not decrement the reference count before this point.
+	There is a potential issue where a thread attempting to truncate
+	an undo tablespace may end up truncating this undo space
+	before this thread can complete the cleanup.
+	While truncating an undo space, the server tries to find if any
+	transaction is actively using the undo log being truncated. A
+	non-zero reference count ensures that the thread attempting to
+	truncate the undo tablespace cannot be successful as the undo log
+	cannot be truncated until it is empty. */
+	if (trx->rsegs.m_redo.rseg != NULL) {
+		trx_rseg_t*	rseg = trx->rsegs.m_redo.rseg;
+		mutex_enter(&rseg->mutex);
+		ut_ad(rseg->trx_ref_count > 0);
+		--rseg->trx_ref_count;
+		mutex_exit(&rseg->mutex);
+		trx->rsegs.m_redo.rseg = NULL;
 	}
 
 	/* Free all savepoints, starting from the first. */
@@ -2163,7 +2183,7 @@ trx_commit_low(
 	} else {
 		serialised = false;
 	}
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 	/* In case of this function is called from a stack executing
 	   THD::release_resources -> ...
               innobase_connection_close() ->
@@ -2496,7 +2516,7 @@ trx_print_low(
 			/*!< in: transaction */
 	ulint		max_query_len,
 			/*!< in: max query length to print,
-			or 0 to use the default max length */
+			must be positive */
 	ulint		n_rec_locks,
 			/*!< in: lock_number_of_rows_locked(&trx->lock) */
 	ulint		n_trx_locks,

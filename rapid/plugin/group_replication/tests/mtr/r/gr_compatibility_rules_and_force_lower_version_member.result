@@ -26,7 +26,7 @@ SET session sql_log_bin=0;
 call mtr.add_suppression("Member version is incompatible with the group");
 SET session sql_log_bin=1;
 SET @debug_saved= @@GLOBAL.DEBUG;
-SET @@GLOBAL.DEBUG= '+d,group_replication_compatibility_rule_error';
+SET @@GLOBAL.DEBUG= '+d,group_replication_compatibility_rule_error_major';
 SET GLOBAL group_replication_group_name= "6db14550-03bb-11e5-b939-0800200c9a13";
 SET GLOBAL group_replication_allow_local_lower_version_join= ON;
 START GROUP_REPLICATION;
@@ -38,7 +38,7 @@ ERROR HY000: The server is not configured properly to be an active member of the
 # able to join the group.
 #
 SET @@GLOBAL.DEBUG= @debug_save;
-# restart:--group_replication_local_address=GROUP_REPLICATION_LOCAL_ADDRESS --group_replication_group_seeds=GROUP_REPLICATION_GROUP_SEEDS
+# restart:--group_replication_local_address=GROUP_REPLICATION_LOCAL_ADDRESS --group_replication_group_seeds=GROUP_REPLICATION_GROUP_SEEDS --group_replication_ip_whitelist=GROUP_REPLICATION_GROUP_WHITELIST
 include/rpl_reconnect.inc
 SET GLOBAL group_replication_allow_local_lower_version_join= ON;
 include/start_group_replication.inc

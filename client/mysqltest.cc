@@ -1,13 +1,20 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -747,11 +754,11 @@ public:
   void write(DYNAMIC_STRING* ds)
   {
     DBUG_ENTER("LogFile::write");
-    DBUG_ASSERT(m_file);
+    assert(m_file);
 
     if (ds->length == 0)
       DBUG_VOID_RETURN;
-    DBUG_ASSERT(ds->str);
+    assert(ds->str);
 
     if (fwrite(ds->str, 1, ds->length, m_file) != ds->length)
       die("Failed to write %lu bytes to '%s', errno: %d",
@@ -912,7 +919,7 @@ extern "C" void *connection_thread(void *arg)
         cn->result= mysql_read_query_result(&cn->mysql);
         break;
       default:
-        DBUG_ASSERT(0);
+        assert(0);
     }
     cn->command= 0;
     native_mutex_lock(&cn->result_mutex);
@@ -930,7 +937,7 @@ end_thread:
 
 static void wait_query_thread_done(struct st_connection *con)
 {
-  DBUG_ASSERT(con->has_thread);
+  assert(con->has_thread);
   if (!con->query_done)
   {
     native_mutex_lock(&con->result_mutex);
@@ -943,7 +950,7 @@ static void wait_query_thread_done(struct st_connection *con)
 
 static void signal_connection_thd(struct st_connection *cn, int command)
 {
-  DBUG_ASSERT(cn->has_thread);
+  assert(cn->has_thread);
   cn->query_done= 0;
   cn->command= command;
   native_mutex_lock(&cn->query_mutex);
@@ -971,7 +978,7 @@ static int do_send_query(struct st_connection *cn, const char *q, size_t q_len)
 
 static int do_read_query_result(struct st_connection *cn)
 {
-  DBUG_ASSERT(cn->has_thread);
+  assert(cn->has_thread);
   wait_query_thread_done(cn);
   signal_connection_thd(cn, EMB_READ_QUERY_RESULT);
   wait_query_thread_done(cn);
@@ -1295,7 +1302,7 @@ void check_command_args(struct st_command *command,
       break;
 
     default:
-      DBUG_ASSERT("Unknown argument type");
+      assert("Unknown argument type");
       break;
     }
 
@@ -1484,7 +1491,7 @@ static void cleanup_and_exit(int exit_code)
     break;
     default:
       printf("unknown exit code: %d\n", exit_code);
-      DBUG_ASSERT(0);
+      assert(0);
     }
   }
 
@@ -2103,7 +2110,7 @@ void check_result()
   const char* mess= "Result content mismatch\n";
 
   DBUG_ENTER("check_result");
-  DBUG_ASSERT(result_file_name);
+  assert(result_file_name);
   DBUG_PRINT("enter", ("result_file_name: %s", result_file_name));
 
   switch (compare_files(log_file.file_name(), result_file_name)) {
@@ -2421,7 +2428,7 @@ void var_set(const char *var_name, const char *var_name_end,
       v->str_val_len= strlen(v->str_val);
     }
     /* setenv() expects \0-terminated strings */
-    DBUG_ASSERT(v->name[v->name_len] == 0);
+    assert(v->name[v->name_len] == 0);
     setenv(v->name, v->str_val, 1);
   }
   DBUG_VOID_RETURN;
@@ -3240,14 +3247,13 @@ static int replace(DYNAMIC_STRING *ds_str,
 void do_exec(struct st_command *command, bool run_in_background)
 {
   int error;
-  char buf[512];
   FILE *res_file;
   char *cmd= command->first_argument;
   DYNAMIC_STRING ds_cmd;
   DBUG_ENTER("do_exec");
   DBUG_PRINT("enter", ("cmd: '%s'", cmd));
 
-  /* Skip leading space */
+  // Skip leading space
   while (*cmd && my_isspace(charset_info, *cmd))
     cmd++;
   if (!*cmd)
@@ -3255,21 +3261,22 @@ void do_exec(struct st_command *command, bool run_in_background)
   command->last_argument= command->end;
 
   init_dynamic_string(&ds_cmd, 0, command->query_len+256, 256);
-  /* Eval the command, thus replacing all environment variables */
+  // Eval the command, thus replacing all environment variables
   do_eval(&ds_cmd, cmd, command->end, !is_windows);
 
-  /* Check if echo should be replaced with "builtin" echo */
+  // Check if echo should be replaced with "builtin" echo
   if (builtin_echo[0] && strncmp(cmd, "echo", 4) == 0)
   {
-    /* Replace echo with our "builtin" echo */
+    // Replace echo with our "builtin" echo
     replace(&ds_cmd, "echo", 4, builtin_echo, strlen(builtin_echo));
   }
 
 #ifdef _WIN32
-  /* Replace /dev/null with NUL */
+  // Replace "/dev/null" with NUL
   while(replace(&ds_cmd, "/dev/null", 9, "NUL", 3) == 0)
     ;
-  /* Replace "closed stdout" with non existing output fd */
+
+  // Replace "closed stdout" with non existing output fd
   while(replace(&ds_cmd, ">&-", 3, ">&4", 3) == 0)
     ;
 #endif
@@ -3291,7 +3298,7 @@ void do_exec(struct st_command *command, bool run_in_background)
   }
 
 
-  /* exec command is interpreted externally and will not take newlines */
+  // exec command is interpreted externally and will not take newlines
   while(replace(&ds_cmd, "\n", 1, " ", 1) == 0)
     ;
   
@@ -3305,8 +3312,13 @@ void do_exec(struct st_command *command, bool run_in_background)
   }
   if(!run_in_background)
   {
+    char buf[512];
+    std::string str;
     while (fgets(buf, sizeof(buf), res_file))
     {
+      if (strlen(buf) < 1)
+        continue;
+
       if (disable_result_log)
       {
         buf[strlen(buf)-1]=0;
@@ -3314,10 +3326,36 @@ void do_exec(struct st_command *command, bool run_in_background)
       }
       else
       {
-        replace_dynstr_append(&ds_res, buf);
+        // Read the file line by line. Check if the buffer read from the
+        // file ends with EOL character.
+        if ((buf[strlen(buf)-1] != '\n' && strlen(buf) < (sizeof(buf) - 1)) ||
+            (buf[strlen(buf)-1] == '\n'))
+        {
+          // Found EOL
+          if (str.length())
+          {
+            // Temporary string exists, append the current buffer read
+            // to the temporary string.
+            str.append(buf);
+            replace_dynstr_append(&ds_res, str.c_str());
+            str.clear();
+          }
+          else
+          {
+            // Entire line is read at once
+            replace_dynstr_append(&ds_res, buf);
+          }
+        }
+        else
+        {
+          // The buffer read from the file doesn't end with EOL character,
+          // store it in a temporary string.
+          str.append(buf);
+        }
       }
     }
   }
+
   error= pclose(res_file);
   if (error > 0)
   {
@@ -3362,7 +3400,7 @@ void do_exec(struct st_command *command, bool run_in_background)
   else if (command->expected_errors.err[0].type == ERR_ERRNO &&
            command->expected_errors.err[0].code.errnum != 0)
   {
-    /* Error code we wanted was != 0, i.e. not an expected success */
+    // Error code we wanted was != 0, i.e. not an expected success
     log_msg("exec of '%s failed, error: %d, errno: %d",
             ds_cmd.str, error, errno);
     dynstr_free(&ds_cmd);
@@ -6132,12 +6170,10 @@ void do_connect(struct st_command *command)
   if (ds_default_auth.length)
     mysql_options(&con_slot->mysql, MYSQL_DEFAULT_AUTH, ds_default_auth.str);
 
-#if !defined(HAVE_YASSL)
   /* Set server public_key */
   if (opt_server_public_key && *opt_server_public_key)
     mysql_options(&con_slot->mysql, MYSQL_SERVER_PUBLIC_KEY,
                   opt_server_public_key);
-#endif
   
   if (con_cleartext_enable)
     mysql_options(&con_slot->mysql, MYSQL_ENABLE_CLEARTEXT_PLUGIN,
@@ -7025,7 +7061,7 @@ static struct my_option my_long_options[] =
    GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
   {"database", 'D', "Database to use.", &opt_db, &opt_db, 0,
    GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-#ifdef DBUG_OFF
+#ifdef NDEBUG
   {"debug", '#', "This is a non-debug version. Catch this and exit.",
    0,0, 0, GET_DISABLED, OPT_ARG, 0, 0, 0, 0, 0, 0},
   {"debug-check", OPT_DEBUG_CHECK, "This is a non-debug version. Catch this and exit.",
@@ -7147,12 +7183,10 @@ static struct my_option my_long_options[] =
   {"plugin_dir", OPT_PLUGIN_DIR, "Directory for client-side plugins.",
     &opt_plugin_dir, &opt_plugin_dir, 0,
    GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-#if !defined(HAVE_YASSL) 
   {"server-public-key-path", OPT_SERVER_PUBLIC_KEY,
    "File path to the server public RSA key in PEM format.",
    &opt_server_public_key, &opt_server_public_key, 0,
    GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
-#endif
   { 0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}
 };
 
@@ -7227,7 +7261,7 @@ get_one_option(int optid, const struct my_option *opt, char *argument)
 {
   switch(optid) {
   case '#':
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     DBUG_PUSH(argument ? argument : "d:t:S:i:O,/tmp/mysqltest.trace");
     debug_check_flag= 1;
 #endif
@@ -7244,7 +7278,7 @@ get_one_option(int optid, const struct my_option *opt, char *argument)
       argument= buff;
     }
     fn_format(buff, argument, "", "", MY_UNPACK_FILENAME);
-    DBUG_ASSERT(cur_file == file_stack && cur_file->file == 0);
+    assert(cur_file == file_stack && cur_file->file == 0);
     if (!(cur_file->file=
           fopen(buff, "rb")))
       die("Could not open '%s' for reading, errno: %d", buff, errno);
@@ -7868,7 +7902,7 @@ int append_warnings(DYNAMIC_STRING *ds, MYSQL* mysql)
     through PS API we should not issue SHOW WARNINGS until
     we have not read all results...
   */
-  DBUG_ASSERT(!mysql_more_results(mysql));
+  assert(!mysql_more_results(mysql));
 
   if (mysql_real_query(mysql, "SHOW WARNINGS", 13))
     die("Error running query \"SHOW WARNINGS\": %s", mysql_error(mysql));
@@ -8009,7 +8043,7 @@ void run_query_normal(struct st_connection *cn, struct st_command *command,
 		 mysql_sqlstate(mysql), ds);
     goto end;
   }
-  DBUG_ASSERT(err == -1); /* Successful and there are no more results */
+  assert(err == -1); /* Successful and there are no more results */
 
   /* If we come here the query is both executed and read successfully */
   handle_no_error(command);
@@ -8794,7 +8828,8 @@ void run_explain(struct st_connection *cn, struct st_command *command,
 char *re_eprint(int err)
 {
   static char epbuf[100];
-  size_t len= my_regerror(MY_REG_ITOA | err, NULL, epbuf, sizeof(epbuf));
+  size_t len MY_ATTRIBUTE((unused))
+      = my_regerror(MY_REG_ITOA | err, NULL, epbuf, sizeof(epbuf));
   assert(len <= sizeof(epbuf));
   return(epbuf);
 }
@@ -10266,7 +10301,7 @@ void replace_strings_append(REPLACE *rep, DYNAMIC_STRING* ds,
       DBUG_PRINT("exit", ("Found end of from string"));
       DBUG_VOID_RETURN;
     }
-    DBUG_ASSERT(from <= str+len);
+    assert(from <= str+len);
     start= from;
     rep_pos=rep;
   }

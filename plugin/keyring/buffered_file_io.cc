@@ -1,13 +1,20 @@
-/* Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2016, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -94,7 +101,12 @@ my_bool Buffered_file_io::is_file_version_correct(File file)
 
 my_bool Buffered_file_io::check_if_keyring_file_can_be_opened_or_created()
 {
+  // Check if the file exists
+  int file_exist= !my_access(this->keyring_filename.c_str(), F_OK);
+
+  // try creating file or opening existing
   File file= file_io.open(keyring_file_data_key, this->keyring_filename.c_str(),
+                          file_exist && keyring_open_mode ? O_RDONLY :
                           O_RDWR | O_CREAT, MYF(MY_WME));
   if (file < 0 ||
       file_io.seek(file, 0, MY_SEEK_END, MYF(MY_WME)) == MY_FILEPOS_ERROR)
@@ -200,7 +212,7 @@ my_bool Buffered_file_io::recreate_keyring_from_backup_if_backup_exists()
 
 my_bool Buffered_file_io::init(std::string *keyring_filename)
 {
-  DBUG_ASSERT(keyring_filename->empty() == FALSE);
+  assert(keyring_filename->empty() == FALSE);
 #ifdef HAVE_PSI_INTERFACE
   keyring_init_psi_file_keys();
 #endif
@@ -261,7 +273,7 @@ my_bool Buffered_file_io::flush_to_backup(ISerialized_object *serialized_object)
   }
 
   Buffer *buffer= dynamic_cast<Buffer*>(serialized_object);
-  DBUG_ASSERT(buffer != NULL);
+  assert(buffer != NULL);
   return buffer == NULL ||
          flush_buffer_to_file(buffer, backup_file) ||
          file_io.close(backup_file, MYF(MY_WME)) < 0;
@@ -291,8 +303,8 @@ my_bool Buffered_file_io::read_keyring_stat(File file)
 my_bool Buffered_file_io::flush_to_storage(ISerialized_object *serialized_object)
 {
   Buffer *buffer= dynamic_cast<Buffer*>(serialized_object);
-  DBUG_ASSERT(buffer != NULL);
-  DBUG_ASSERT(serialized_object->get_key_operation() != NONE);
+  assert(buffer != NULL);
+  assert(serialized_object->get_key_operation() != NONE);
 
   File keyring_file= file_io.open(keyring_file_data_key,
                                   this->keyring_filename.c_str(), O_CREAT | O_RDWR,
@@ -320,8 +332,13 @@ ISerializer* Buffered_file_io::get_serializer()
 
 my_bool Buffered_file_io::get_serialized_object(ISerialized_object **serialized_object)
 {
+  // Check if the file exists
+  int file_exist= !my_access(keyring_filename.c_str(), F_OK);
+
+  // try creating file or opening existing
   File file= file_io.open(keyring_file_data_key, keyring_filename.c_str(),
-                          O_CREAT | O_RDWR, MYF(MY_WME));
+                          file_exist && keyring_open_mode ? O_RDONLY :
+                          O_RDWR | O_CREAT, MYF(MY_WME));
 
   *serialized_object= NULL;
 

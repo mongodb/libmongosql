@@ -1,13 +1,20 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -323,7 +330,7 @@ public:
       other Error
   */
   virtual int init_ror_merged_scan(bool reuse_handler)
-  { DBUG_ASSERT(0); return 1; }
+  { assert(0); return 1; }
 
   /*
     Save ROWID of last retrieved row in file->ref. This used in ROR-merging.
@@ -368,7 +375,7 @@ public:
     Table record buffer used by this quick select.
   */
   uchar    *record;
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   /*
     Print quick select information to DBUG_FILE. Caller is responsible
     for locking DBUG_FILE before this call and unlocking it afterwards.
@@ -500,7 +507,7 @@ public:
   virtual bool is_agg_loose_index_scan() const { return false; }
   void add_keys_and_lengths(String *key_names, String *used_lengths);
   void add_info_string(String *str);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   void dbug_dump(int indent, bool verbose);
 #endif
   QUICK_SELECT_I *make_reverse(uint used_key_parts_arg);
@@ -597,7 +604,7 @@ public:
   ~QUICK_INDEX_MERGE_SELECT();
 
   int  init();
-  void need_sorted_output() { DBUG_ASSERT(false); /* Can't do it */ }
+  void need_sorted_output() { assert(false); /* Can't do it */ }
   int  reset(void);
   int  get_next();
   bool reverse_sorted() const { return false; }
@@ -609,7 +616,7 @@ public:
   void add_keys_and_lengths(String *key_names, String *used_lengths);
   void add_info_string(String *str);
   bool is_keys_used(const MY_BITMAP *fields);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   void dbug_dump(int indent, bool verbose);
 #endif
 
@@ -689,7 +696,7 @@ public:
   ~QUICK_ROR_INTERSECT_SELECT();
 
   int  init();
-  void need_sorted_output() { DBUG_ASSERT(false); /* Can't do it */ }
+  void need_sorted_output() { assert(false); /* Can't do it */ }
   int  reset(void);
   int  get_next();
   bool reverse_sorted() const { return false; }
@@ -701,7 +708,7 @@ public:
   void add_keys_and_lengths(String *key_names, String *used_lengths);
   void add_info_string(String *str);
   bool is_keys_used(const MY_BITMAP *fields);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   void dbug_dump(int indent, bool verbose);
 #endif
   int init_ror_merged_scan(bool reuse_handler);
@@ -788,7 +795,7 @@ public:
   ~QUICK_ROR_UNION_SELECT();
 
   int  init();
-  void need_sorted_output() { DBUG_ASSERT(false); /* Can't do it */ }
+  void need_sorted_output() { assert(false); /* Can't do it */ }
   int  reset(void);
   int  get_next();
   bool reverse_sorted() const { return false; }
@@ -800,7 +807,7 @@ public:
   void add_keys_and_lengths(String *key_names, String *used_lengths);
   void add_info_string(String *str);
   bool is_keys_used(const MY_BITMAP *fields);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   void dbug_dump(int indent, bool verbose);
 #endif
 
@@ -956,7 +963,7 @@ public:
   virtual bool is_loose_index_scan() const { return true; }
   virtual bool is_agg_loose_index_scan() const { return is_agg_distinct(); }
   void add_keys_and_lengths(String *key_names, String *used_lengths);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   void dbug_dump(int indent, bool verbose);
 #endif
   bool is_agg_distinct() const { return have_agg_distinct; }
@@ -1005,9 +1012,8 @@ int test_quick_select(THD *thd, key_map keys, table_map prev_tables,
                       ha_rows limit, bool force_quick_range,
                       const ORDER::enum_order interesting_order,
                       const QEP_shared_owner *tab,
-                      Item *cond,
-                      key_map *needed_reg,
-                      QUICK_SELECT_I **quick);
+                      Item *cond, key_map *needed_reg,
+                      QUICK_SELECT_I **quick, bool ignore_table_scan);
 
 class FT_SELECT: public QUICK_RANGE_SELECT 
 {

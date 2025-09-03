@@ -1,13 +1,20 @@
-/* Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2008, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -38,7 +45,7 @@
   Worth to note:
   - File descriptors used here are located in a range that is not compatible 
   with CRT on purpose. Attempt to use a file descriptor from Windows CRT library
-  range in my_win_* function will be punished with DBUG_ASSERT()
+  range in my_win_* function will be punished with assert()
 
   - File streams (FILE *) are actually from the C runtime. The routines provided
   here are useful only in scernarios that use low-level IO with my_win_fileno()
@@ -82,7 +89,7 @@ File my_open_osfhandle(HANDLE handle, int oflag)
 static void invalidate_fd(File fd)
 {
   DBUG_ENTER("invalidate_fd");
-  DBUG_ASSERT(fd >= MY_FILE_MIN && fd < (int)my_file_limit);
+  assert(fd >= MY_FILE_MIN && fd < (int)my_file_limit);
   my_file_info[fd].fhandle= 0;
   DBUG_VOID_RETURN;
 }
@@ -92,7 +99,7 @@ static void invalidate_fd(File fd)
 HANDLE my_get_osfhandle(File fd)
 {
   DBUG_ENTER("my_get_osfhandle");
-  DBUG_ASSERT(fd >= MY_FILE_MIN && fd < (int)my_file_limit);
+  assert(fd >= MY_FILE_MIN && fd < (int)my_file_limit);
   DBUG_RETURN(my_file_info[fd].fhandle);
 }
 
@@ -100,7 +107,7 @@ HANDLE my_get_osfhandle(File fd)
 static int my_get_open_flags(File fd)
 {
   DBUG_ENTER("my_get_open_flags");
-  DBUG_ASSERT(fd >= MY_FILE_MIN && fd < (int)my_file_limit);
+  assert(fd >= MY_FILE_MIN && fd < (int)my_file_limit);
   DBUG_RETURN(my_file_info[fd].oflag);
 }
 

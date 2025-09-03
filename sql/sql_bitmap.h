@@ -1,13 +1,20 @@
-/* Copyright (c) 2003, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2003, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -63,7 +70,7 @@ public:
                                     (static_cast<void *>(&buf2))),
                 map2buff);
     } else {
-      DBUG_ASSERT(sizeof(buffer) >= 4);
+      assert(sizeof(buffer) >= 4);
       int4store(const_cast<uchar *>(static_cast<uchar *>
                                     (static_cast<void *>(&buf2))),
                 static_cast<uint32>(map2buff));
@@ -111,7 +118,7 @@ public:
     if (sizeof(buffer) >= 8)
       return uint8korr(static_cast<const uchar *>
                        (static_cast<const void *>(buffer)));
-    DBUG_ASSERT(sizeof(buffer) >= 4);
+    assert(sizeof(buffer) >= 4);
     return (ulonglong)
       uint4korr(static_cast<const uchar *>
                 (static_cast<const void *>(buffer)));
@@ -130,8 +137,8 @@ public:
   void init() { clear_all(); }
   void init(uint prefix_to_set) { set_prefix(prefix_to_set); }
   uint length() const { return 64; }
-  void set_bit(uint n) { DBUG_ASSERT(n < 64); map|= ((ulonglong)1) << n; }
-  void clear_bit(uint n) { DBUG_ASSERT(n < 64); map&= ~(((ulonglong)1) << n); }
+  void set_bit(uint n) { assert(n < 64); map|= ((ulonglong)1) << n; }
+  void clear_bit(uint n) { assert(n < 64); map&= ~(((ulonglong)1) << n); }
   void set_prefix(uint n)
   {
     if (n >= length())
@@ -147,10 +154,10 @@ public:
   void subtract(const Bitmap<64>& map2) { map&= ~map2.map; }
   void merge(const Bitmap<64>& map2) { map|= map2.map; }
   my_bool is_set(uint n) const
-  { DBUG_ASSERT(n < 64); return MY_TEST(map & (((ulonglong)1) << n)); }
+  { assert(n < 64); return MY_TEST(map & (((ulonglong)1) << n)); }
   my_bool is_prefix(uint n) const
   {
-    DBUG_ASSERT(n <= 64);
+    assert(n <= 64);
     if (n < 64)
       return map == (((ulonglong)1) << n)-1;
     else

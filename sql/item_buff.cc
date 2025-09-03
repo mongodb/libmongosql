@@ -1,13 +1,20 @@
-/* Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -57,7 +64,7 @@ Cached_item *new_Cached_item(THD *thd, Item *item, bool use_result_field)
     return new Cached_item_decimal(item);
   case ROW_RESULT:
   default:
-    DBUG_ASSERT(0);
+    assert(0);
     return 0;
   }
 }
@@ -83,8 +90,8 @@ bool Cached_item_str::cmp(void)
   bool tmp;
 
   DBUG_ENTER("Cached_item_str::cmp");
-  DBUG_ASSERT(!item->is_temporal());
-  DBUG_ASSERT(item->field_type() != MYSQL_TYPE_JSON);
+  assert(!item->is_temporal());
+  assert(item->field_type() != MYSQL_TYPE_JSON);
   if ((res=item->val_str(&tmp_value)))
     res->length(min(res->length(), static_cast<size_t>(value_max_length)));
   DBUG_PRINT("info", ("old: %s, new: %s",

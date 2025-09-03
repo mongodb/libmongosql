@@ -1,13 +1,20 @@
-/* Copyright (c) 2015, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -76,6 +83,10 @@ void set_mi_settings(Master_info *mi, Channel_creation_info* channel_info)
   mysql_mutex_lock(&mi->data_lock);
 
   mi->rli->set_thd_tx_priority(channel_info->thd_tx_priority);
+
+  mi->rli->set_ignore_write_set_memory_limit(
+      channel_info->m_ignore_write_set_memory_limit);
+  mi->rli->set_allow_drop_write_set(channel_info->m_allow_drop_write_set);
 
   mi->rli->replicate_same_server_id=
     (channel_info->replicate_same_server_id == RPL_SERVICE_SERVER_DEFAULT) ?
@@ -156,6 +167,8 @@ initialize_channel_creation_info(Channel_creation_info* channel_info)
   channel_info->preserve_relay_logs= false;
   channel_info->retry_count= 0;
   channel_info->connect_retry= 0;
+  channel_info->m_ignore_write_set_memory_limit = false;
+  channel_info->m_allow_drop_write_set = false;
 }
 
 void initialize_channel_ssl_info(Channel_ssl_info* channel_ssl_info)
@@ -405,11 +418,11 @@ int channel_start(const char* channel,
         lex_mi.until_after_gaps= true;
         break;
       case CHANNEL_UNTIL_VIEW_ID:
-        DBUG_ASSERT((thread_mask & SLAVE_SQL) && connection_info->view_id);
+        assert((thread_mask & SLAVE_SQL) && connection_info->view_id);
         lex_mi.view_id= connection_info->view_id;
         break;
       default:
-        DBUG_ASSERT(0);
+        assert(0);
     }
   }
 
@@ -474,12 +487,12 @@ int channel_stop(Master_info *mi,
     DBUG_RETURN(RPL_CHANNEL_SERVICE_CHANNEL_DOES_NOT_EXISTS_ERROR);
   }
 
-  mi->channel_rdlock();
-
   int thread_mask= 0;
   int server_thd_mask= 0;
   int error= 0;
   bool thd_init= false;
+
+  mi->channel_wrlock();
   lock_slave_threads(mi);
 
   init_thread_mask(&server_thd_mask, mi, 0 /* not inverse*/);
@@ -617,11 +630,8 @@ bool channel_is_active(const char* channel, enum_channel_thread_types thd_type)
     DBUG_RETURN(false);
   }
 
-  mi->channel_rdlock();
-
   init_thread_mask(&thread_mask, mi, 0 /* not inverse*/);
 
-  mi->channel_unlock();
   channel_map.unlock();
 
   switch(thd_type)
@@ -633,7 +643,7 @@ bool channel_is_active(const char* channel, enum_channel_thread_types thd_type)
     case CHANNEL_APPLIER_THREAD:
       DBUG_RETURN(thread_mask & SLAVE_SQL);
     default:
-      DBUG_ASSERT(0);
+      assert(0);
   }
   DBUG_RETURN(false);
 }
@@ -655,8 +665,6 @@ int channel_get_thread_id(const char* channel,
     channel_map.unlock();
     DBUG_RETURN(RPL_CHANNEL_SERVICE_CHANNEL_DOES_NOT_EXISTS_ERROR);
   }
-
-  mi->channel_rdlock();
 
   switch(thd_type)
   {
@@ -741,10 +749,9 @@ int channel_get_thread_id(const char* channel,
       }
       break;
     default:
-      DBUG_RETURN(number_threads);
+      break;
   }
 
-  mi->channel_unlock();
   channel_map.unlock();
 
   DBUG_RETURN(number_threads);
@@ -764,14 +771,13 @@ long long channel_get_last_delivered_gno(const char* channel, int sidno)
     DBUG_RETURN(RPL_CHANNEL_SERVICE_CHANNEL_DOES_NOT_EXISTS_ERROR);
   }
 
-  mi->channel_rdlock();
   rpl_gno last_gno= 0;
 
   global_sid_lock->rdlock();
   last_gno= mi->rli->get_gtid_set()->get_last_gno(sidno);
   global_sid_lock->unlock();
 
-#if !defined(DBUG_OFF)
+#if !defined(NDEBUG)
   const Gtid_set *retrieved_gtid_set= mi->rli->get_gtid_set();
   char *retrieved_gtid_set_string= NULL;
   global_sid_lock->wrlock();
@@ -782,7 +788,6 @@ long long channel_get_last_delivered_gno(const char* channel, int sidno)
   my_free(retrieved_gtid_set_string);
 #endif
 
-  mi->channel_unlock();
   channel_map.unlock();
 
   DBUG_RETURN(last_gno);
@@ -800,15 +805,13 @@ int channel_add_executed_gtids_to_received_gtids(const char* channel)
     DBUG_RETURN(RPL_CHANNEL_SERVICE_CHANNEL_DOES_NOT_EXISTS_ERROR);
   }
 
-  mi->channel_rdlock();
-  channel_map.unlock();
   global_sid_lock->wrlock();
 
   enum_return_status return_status=
       mi->rli->add_gtid_set(gtid_state->get_executed_gtids());
 
   global_sid_lock->unlock();
-  mi->channel_unlock();
+  channel_map.unlock();
 
   DBUG_RETURN(return_status != RETURN_STATUS_OK);
 }
@@ -1012,8 +1015,6 @@ bool channel_is_stopping(const char* channel,
     DBUG_RETURN(false);
   }
 
-  mi->channel_rdlock();
-
   switch(thd_type)
   {
     case CHANNEL_NO_THD:
@@ -1025,10 +1026,9 @@ bool channel_is_stopping(const char* channel,
       is_stopping= likely(mi->rli->is_stopping.atomic_get());
       break;
     default:
-      DBUG_ASSERT(0);
+      assert(0);
   }
 
-  mi->channel_unlock();
   channel_map.unlock();
 
   DBUG_RETURN(is_stopping);
@@ -1044,9 +1044,7 @@ bool is_partial_transaction_on_channel_relay_log(const char *channel)
     channel_map.unlock();
     DBUG_RETURN(false);
   }
-  mi->channel_rdlock();
   bool ret= mi->transaction_parser.is_inside_transaction();
-  mi->channel_unlock();
   channel_map.unlock();
   DBUG_RETURN(ret);
 }

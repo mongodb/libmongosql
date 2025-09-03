@@ -1,13 +1,20 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -696,7 +703,7 @@ public:
   void set_explain_marker(enum_parsing_context m);
   void set_explain_marker_from(const st_select_lex_unit *u);
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   /**
      Asserts that none of {this unit and its children units} is fully cleaned
      up.
@@ -728,8 +735,8 @@ public:
   Ref_ptr_array ref_ptr_array_slice(size_t slice_num)
   {
     size_t slice_sz= ref_pointer_array.size() / 5U;
-    DBUG_ASSERT(ref_pointer_array.size() % 5 == 0);
-    DBUG_ASSERT(slice_num < 5U);
+    assert(ref_pointer_array.size() % 5 == 0);
+    assert(slice_num < 5U);
     return Ref_ptr_array(&ref_pointer_array[slice_num * slice_sz], slice_sz);
   }
 
@@ -750,7 +757,7 @@ public:
     DBUG_EXECUTE_IF("no_const_tables", options_arg|= OPTION_NO_CONST_TABLES;);
 
     // Make sure we do not overwrite options by accident
-    DBUG_ASSERT(m_base_options == 0 && m_active_options == 0);
+    assert(m_base_options == 0 && m_active_options == 0);
     m_base_options= options_arg;
     m_active_options= options_arg;
   }
@@ -758,7 +765,7 @@ public:
   /// Add base options to a query block, also update active options
   void add_base_options(ulonglong options)
   {
-    DBUG_ASSERT(first_execution);
+    assert(first_execution);
     m_base_options|= options;
     m_active_options|= options;
   }
@@ -770,7 +777,7 @@ public:
   */
   void remove_base_options(ulonglong options)
   {
-    DBUG_ASSERT(first_execution);
+    assert(first_execution);
     m_base_options&= ~options;
     m_active_options&= ~options;
   }
@@ -1221,7 +1228,7 @@ public:
   void set_lock_for_tables(thr_lock_type lock_type);
   inline void init_order()
   {
-    DBUG_ASSERT(order_list.elements == 0);
+    assert(order_list.elements == 0);
     order_list.elements= 0;
     order_list.first= 0;
     order_list.next= &order_list.first;
@@ -1374,6 +1381,7 @@ private:
   /// Merge derived table into query block
 public:
   bool merge_derived(THD *thd, TABLE_LIST *derived_table);
+  bool is_in_select_list(Item *cand);
 private:
   bool convert_subquery_to_semijoin(Item_exists_subselect *subq_pred);
   void remap_tables(THD *thd);
@@ -2147,7 +2155,7 @@ public:
   */
   inline void set_stmt_unsafe(enum_binlog_stmt_unsafe unsafe_type) {
     DBUG_ENTER("set_stmt_unsafe");
-    DBUG_ASSERT(unsafe_type >= 0 && unsafe_type < BINLOG_STMT_UNSAFE_COUNT);
+    assert(unsafe_type >= 0 && unsafe_type < BINLOG_STMT_UNSAFE_COUNT);
     binlog_stmt_flags|= (1U << unsafe_type);
     DBUG_VOID_RETURN;
   }
@@ -2162,7 +2170,7 @@ public:
   */
   inline void set_stmt_unsafe_flags(uint32 flags) {
     DBUG_ENTER("set_stmt_unsafe_flags");
-    DBUG_ASSERT((flags & ~BINLOG_STMT_UNSAFE_ALL_FLAGS) == 0);
+    assert((flags & ~BINLOG_STMT_UNSAFE_ALL_FLAGS) == 0);
     binlog_stmt_flags|= flags;
     DBUG_VOID_RETURN;
   }
@@ -2257,7 +2265,7 @@ public:
     STMT_ACCESS_TABLE_COUNT
   };
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   static inline const char *stmt_accessed_table_string(enum_stmt_accessed_table accessed_table)
   {
     switch (accessed_table)
@@ -2288,7 +2296,7 @@ public:
       break;
       case STMT_ACCESS_TABLE_COUNT:
       default:
-        DBUG_ASSERT(0);
+        assert(0);
       break;
     }
     MY_ASSERT_UNREACHABLE();
@@ -2323,7 +2331,7 @@ public:
   {
     DBUG_ENTER("LEX::set_stmt_accessed_table");
 
-    DBUG_ASSERT(accessed_table >= 0 && accessed_table < STMT_ACCESS_TABLE_COUNT);
+    assert(accessed_table >= 0 && accessed_table < STMT_ACCESS_TABLE_COUNT);
     stmt_accessed_table_flag |= (1U << accessed_table);
 
     DBUG_VOID_RETURN;
@@ -2344,7 +2352,7 @@ public:
   {
     DBUG_ENTER("LEX::stmt_accessed_table");
 
-    DBUG_ASSERT(accessed_table >= 0 && accessed_table < STMT_ACCESS_TABLE_COUNT);
+    assert(accessed_table >= 0 && accessed_table < STMT_ACCESS_TABLE_COUNT);
 
     DBUG_RETURN((stmt_accessed_table_flag & (1U << accessed_table)) != 0);
   }
@@ -2380,7 +2388,7 @@ public:
 
       unsafe= (binlog_unsafe_map[stmt_accessed_table_flag] & condition);
 
-#if !defined(DBUG_OFF)
+#if !defined(NDEBUG)
       DBUG_PRINT("LEX::is_mixed_stmt_unsafe", ("RESULT %02X %02X %02X\n", condition,
               binlog_unsafe_map[stmt_accessed_table_flag],
               (binlog_unsafe_map[stmt_accessed_table_flag] & condition)));
@@ -2567,7 +2575,7 @@ public:
   */
   void skip_binary(int n)
   {
-    DBUG_ASSERT(m_ptr + n <= m_end_of_query);
+    assert(m_ptr + n <= m_end_of_query);
     if (m_echo)
     {
       memcpy(m_cpp_ptr, m_ptr, n);
@@ -2582,7 +2590,7 @@ public:
   */
   unsigned char yyGet()
   {
-    DBUG_ASSERT(m_ptr <= m_end_of_query);
+    assert(m_ptr <= m_end_of_query);
     char c= *m_ptr++;
     if (m_echo)
       *m_cpp_ptr++ = c;
@@ -2603,7 +2611,7 @@ public:
   */
   unsigned char yyPeek()
   {
-    DBUG_ASSERT(m_ptr <= m_end_of_query);
+    assert(m_ptr <= m_end_of_query);
     return m_ptr[0];
   }
 
@@ -2613,7 +2621,7 @@ public:
   */
   unsigned char yyPeekn(int n)
   {
-    DBUG_ASSERT(m_ptr + n <= m_end_of_query);
+    assert(m_ptr + n <= m_end_of_query);
     return m_ptr[n];
   }
 
@@ -2634,7 +2642,7 @@ public:
   */
   void yySkip()
   {
-    DBUG_ASSERT(m_ptr <= m_end_of_query);
+    assert(m_ptr <= m_end_of_query);
     if (m_echo)
       *m_cpp_ptr++ = *m_ptr++;
     else
@@ -2647,7 +2655,7 @@ public:
   */
   void yySkipn(int n)
   {
-    DBUG_ASSERT(m_ptr + n <= m_end_of_query);
+    assert(m_ptr + n <= m_end_of_query);
     if (m_echo)
     {
       memcpy(m_cpp_ptr, m_ptr, n);
@@ -2783,7 +2791,7 @@ public:
       The assumption is that the lexical analyser is always 1 character ahead,
       which the -1 account for.
     */
-    DBUG_ASSERT(m_ptr > m_tok_start);
+    assert(m_ptr > m_tok_start);
     return (uint) ((m_ptr - m_tok_start) - 1);
   }
    
@@ -3002,8 +3010,8 @@ public:
   {
     // (2) Only owning thread could change m_current_select
     // (1) bypass for bootstrap and "new THD"
-    DBUG_ASSERT(!current_thd || !thd || //(1)
-                thd == current_thd);    //(2)
+    assert(!current_thd || !thd || //(1)
+           thd == current_thd);    //(2)
     m_current_select= select;
   }
   /// @return true if this is an EXPLAIN statement
@@ -3515,11 +3523,13 @@ public:
     */ 
     if (select_lex == all_selects_list && !sroutines.records)
     {
-      DBUG_ASSERT(!all_selects_list->next_select_in_list());
+      assert(!all_selects_list->next_select_in_list());
       return TRUE;
     }
     return FALSE;
   }
+
+  void release_plugins();
 
   bool accept(Select_lex_visitor *visitor);
 
@@ -3534,16 +3544,22 @@ public:
 class Yacc_state
 {
 public:
-  Yacc_state()
-  {
-    reset();
-  }
+  Yacc_state() : yacc_yyss(NULL), yacc_yyvs(NULL), yacc_yyls(NULL) { reset(); }
 
   void reset()
   {
-    yacc_yyss= NULL;
-    yacc_yyvs= NULL;
-    yacc_yyls= NULL;
+    if (yacc_yyss != NULL) {
+      my_free(yacc_yyss);
+      yacc_yyss = NULL;
+    }
+    if (yacc_yyvs != NULL) {
+      my_free(yacc_yyvs);
+      yacc_yyvs = NULL;
+    }
+    if (yacc_yyls != NULL) {
+      my_free(yacc_yyls);
+      yacc_yyls = NULL;
+    }
     m_lock_type= TL_READ_DEFAULT;
     m_mdl_type= MDL_SHARED_READ;
     m_ha_rkey_mode= HA_READ_KEY_EXACT;
@@ -3618,10 +3634,25 @@ public:
 */
 struct Parser_input
 {
+  /**
+    True if the text parsed corresponds to an actual query,
+    and not another text artifact.
+    This flag is used to disable digest parsing of nested:
+    - view definitions
+    - table trigger definitions
+    - table partition definitions
+    - event scheduler event definitions
+  */
+  bool m_has_digest;
+  /**
+    True if the caller needs to compute a digest.
+    This flag is used to request explicitly a digest computation,
+    independently of the performance schema configuration.
+  */
   bool m_compute_digest;
 
   Parser_input()
-    : m_compute_digest(false)
+    : m_has_digest(false), m_compute_digest(false)
   {}
 };
 

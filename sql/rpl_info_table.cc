@@ -1,13 +1,20 @@
-/* Copyright (c) 2010, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -97,6 +104,8 @@ int Rpl_info_table::do_init_info(enum_find_method method, uint instance)
   THD *thd= access->create_thd();
 
   saved_mode= thd->variables.sql_mode;
+  // Ensure replication tables are always read in a consistent way
+  thd->variables.sql_mode &= ~MODE_PAD_CHAR_TO_FULL_LENGTH;
   tmp_disable_binlog(thd);
 
   /*
@@ -125,7 +134,7 @@ int Rpl_info_table::do_init_info(enum_find_method method, uint instance)
     break;
 
     default:
-      DBUG_ASSERT(0);
+      assert(0);
     break;
   }
 
@@ -144,7 +153,7 @@ end:
   /*
     Unlocks and closes the rpl_info table.
   */
-  access->close_table(thd, table, &backup, error);
+  error= access->close_table(thd, table, &backup, error) || error;
   reenable_binlog(thd);
   thd->variables.sql_mode= saved_mode;
   access->drop_thd(thd);
@@ -254,7 +263,7 @@ end:
   /*
     Unlocks and closes the rpl_info table.
   */
-  access->close_table(thd, table, &backup, error);
+  error= access->close_table(thd, table, &backup, error) || error;
   thd->is_operating_substatement_implicitly= false;
   reenable_binlog(thd);
   thd->variables.sql_mode= saved_mode;
@@ -310,7 +319,7 @@ end:
   /*
     Unlocks and closes the rpl_info table.
   */
-  access->close_table(thd, table, &backup, error);
+  error= access->close_table(thd, table, &backup, error) || error;
   reenable_binlog(thd);
   thd->variables.sql_mode= saved_mode;
   access->drop_thd(thd);
@@ -374,7 +383,7 @@ int Rpl_info_table::do_reset_info(uint nparam,
       todo: for another table in future, consider to make use of the
       passed parameter to locate the lookup key.
     */
-    DBUG_ASSERT(strcmp(info->str_table.str, "slave_worker_info") == 0);
+    assert(strcmp(info->str_table.str, "slave_worker_info") == 0);
 
     if (info->verify_table_primary_key_fields(table))
     {
@@ -423,7 +432,7 @@ end:
   /*
     Unlocks and closes the rpl_info table.
   */
-  info->access->close_table(thd, table, &backup, error);
+  error= info->access->close_table(thd, table, &backup, error) || error;
   reenable_binlog(thd);
   thd->variables.sql_mode= saved_mode;
   info->access->drop_thd(thd);
@@ -598,7 +607,7 @@ end:
   /*
     Unlocks and closes the rpl_info table.
   */
-  info->access->close_table(thd, table, &backup, error);
+  error= info->access->close_table(thd, table, &backup, error) || error;
   thd->variables.sql_mode= saved_mode;
   info->access->drop_thd(thd);
   delete info;
@@ -792,7 +801,7 @@ bool Rpl_info_table::do_update_is_transactional()
   error= FALSE;
 
 end:
-  access->close_table(thd, table, &backup, 0);
+  error= access->close_table(thd, table, &backup, 0) || error;
   reenable_binlog(thd);
   thd->variables.sql_mode= saved_mode;
   access->drop_thd(thd);

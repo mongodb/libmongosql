@@ -1,16 +1,23 @@
 #ifndef SQL_SELECT_INCLUDED
 #define SQL_SELECT_INCLUDED
 
-/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -534,8 +541,8 @@ class Filesort;
    cells, and best_ref may not even have been allocated.
 */
 #define ASSERT_BEST_REF_IN_JOIN_ORDER(join) \
-  do { DBUG_ASSERT(join->tables == 0 ||                         \
-                   (join->best_ref && !join->join_tab)); } while(0)
+  do { assert(join->tables == 0 ||                              \
+              (join->best_ref && !join->join_tab)); } while(0)
 
 
 /**
@@ -781,7 +788,7 @@ public:
   bool operator()(const JOIN_TAB *jt1, const JOIN_TAB *jt2)
   {
     // Sorting distinct tables, so a table should not be compared with itself
-    DBUG_ASSERT(jt1 != jt2);
+    assert(jt1 != jt2);
 
     if (jt1->dependent & jt2->table_ref->map())
       return false;
@@ -819,15 +826,15 @@ public:
   bool operator()(const JOIN_TAB *jt1, const JOIN_TAB *jt2)
   {
     // Sorting distinct tables, so a table should not be compared with itself
-    DBUG_ASSERT(jt1 != jt2);
+    assert(jt1 != jt2);
 
     /*
       We don't do subquery flattening if the parent or child select has
       STRAIGHT_JOIN modifier. It is complicated to implement and the semantics
       is hardly useful.
     */
-    DBUG_ASSERT(!jt1->emb_sj_nest);
-    DBUG_ASSERT(!jt2->emb_sj_nest);
+    assert(!jt1->emb_sj_nest);
+    assert(!jt2->emb_sj_nest);
 
     if (jt1->dependent & jt2->table_ref->map())
       return false;
@@ -855,7 +862,7 @@ public:
   bool operator()(const JOIN_TAB *jt1, const JOIN_TAB *jt2)
   {
     // Sorting distinct tables, so a table should not be compared with itself
-    DBUG_ASSERT(jt1 != jt2);
+    assert(jt1 != jt2);
 
     if (jt1->emb_sj_nest == emb_nest && jt2->emb_sj_nest != emb_nest)
       return true;
@@ -968,7 +975,7 @@ type_conversion_status_to_store_key (type_conversion_status ts)
   case TYPE_ERR_OOM:
     return store_key::STORE_KEY_FATAL;
   default:
-    DBUG_ASSERT(false); // not possible
+    assert(false); // not possible
   }
 
   return store_key::STORE_KEY_FATAL;

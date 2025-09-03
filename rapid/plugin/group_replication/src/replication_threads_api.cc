@@ -1,13 +1,20 @@
-/* Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -33,7 +40,9 @@ Replication_thread_api::initialize_channel(char* hostname,
                                            bool  ssl_verify_server_cert,
                                            int   priority,
                                            int   retry_count,
-                                           bool  preserve_logs)
+                                           bool  preserve_logs,
+                                           bool ignore_ws_mem_limit,
+                                           bool allow_drop_write_set)
 {
   DBUG_ENTER("Replication_thread_api::initialize");
   int error= 0;
@@ -59,6 +68,9 @@ Replication_thread_api::initialize_channel(char* hostname,
   info.retry_count= retry_count;
 
   info.preserve_relay_logs= preserve_logs;
+
+  info.m_ignore_write_set_memory_limit = ignore_ws_mem_limit;
+  info.m_allow_drop_write_set = allow_drop_write_set;
 
   if( use_ssl || ssl_ca != NULL || ssl_capath != NULL || ssl_cert != NULL ||
       ssl_cipher!= NULL || ssl_key != NULL || ssl_crl != NULL ||

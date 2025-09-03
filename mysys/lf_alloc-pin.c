@@ -1,14 +1,26 @@
 /* QQ: TODO multi-pinbox */
-/* Copyright (c) 2006, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2006, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
+
+   Without limiting anything contained in the foregoing, this file,
+   which is part of C Driver for MySQL (Connector/C), is also subject to the
+   Universal FOSS Exception, version 1.0, a copy of which can be found at
+   http://oss.oracle.com/licenses/universal-foss-exception.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -109,7 +121,7 @@ static void lf_pinbox_real_free(LF_PINS *pins);
 void lf_pinbox_init(LF_PINBOX *pinbox, uint free_ptr_offset,
                     lf_pinbox_free_func *free_func, void *free_func_arg)
 {
-  DBUG_ASSERT(free_ptr_offset % sizeof(void *) == 0);
+  assert(free_ptr_offset % sizeof(void *) == 0);
   compile_time_assert(sizeof(LF_PINS) == 64);
   lf_dynarray_init(&pinbox->pinarray, sizeof(LF_PINS));
   pinbox->pinstack_top_ver= 0;
@@ -194,14 +206,14 @@ void lf_pinbox_put_pins(LF_PINS *pins)
   uint32 top_ver, nr;
   nr= pins->link;
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   {
     /* This thread should not hold any pin. */
     int i;
     for (i= 0; i < LF_PINBOX_PINS; i++)
-      DBUG_ASSERT(pins->pin[i] == 0);
+      assert(pins->pin[i] == 0);
   }
-#endif /* DBUG_OFF */
+#endif /* NDEBUG */
 
   /*
     XXX this will deadlock if other threads will wait for
@@ -386,7 +398,7 @@ void lf_alloc_init2(LF_ALLOCATOR *allocator, uint size, uint free_ptr_offset,
   allocator->element_size= size;
   allocator->constructor= ctor;
   allocator->destructor= dtor;
-  DBUG_ASSERT(size >= sizeof(void*) + free_ptr_offset);
+  assert(size >= sizeof(void*) + free_ptr_offset);
 }
 
 /*

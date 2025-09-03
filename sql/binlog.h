@@ -1,14 +1,21 @@
 #ifndef BINLOG_H_INCLUDED
-/* Copyright (c) 2010, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -153,8 +160,8 @@ public:
   {
     mysql_mutex_init(key_LOCK_done, &m_lock_done, MY_MUTEX_INIT_FAST);
     mysql_cond_init(key_COND_done, &m_cond_done);
-#ifndef DBUG_OFF
-    /* reuse key_COND_done 'cos a new PSI object would be wasteful in !DBUG_OFF */
+#ifndef NDEBUG
+    /* reuse key_COND_done 'cos a new PSI object would be wasteful in !NDEBUG */
     mysql_cond_init(key_COND_done, &m_cond_preempt);
 #endif
     m_queue[FLUSH_STAGE].init(
@@ -211,7 +218,7 @@ public:
     return m_queue[stage].pop_front();
   }
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   /**
      The method ensures the follower's execution path can be preempted
      by the leader's thread.
@@ -246,7 +253,7 @@ public:
                     session is waiting on
     @param stage    which stage queue size to compare count against.
    */
-  void wait_count_or_timeout(ulong count, ulong usec, StageID stage);
+  void wait_count_or_timeout(ulong count, long usec, StageID stage);
 
   void signal_done(THD *queue);
 
@@ -265,7 +272,7 @@ private:
 
   /** Mutex used for the condition variable above */
   mysql_mutex_t m_lock_done;
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   /** Flag is set by Leader when it starts waiting for follower's all-clear */
   bool leader_await_preempt_status;
 
@@ -571,8 +578,7 @@ public:
   */
   bool find_first_log_not_in_gtid_set(char *binlog_file_name,
                                       const Gtid_set *gtid_set,
-                                      Gtid *first_gtid,
-                                      const char **errmsg);
+                                      Gtid *first_gtid, std::string &errmsg);
 
   /**
     Reads the set of all GTIDs in the binary/relay log, and the set
@@ -607,7 +613,7 @@ public:
 
   void set_previous_gtid_set_relaylog(Gtid_set *previous_gtid_set_param)
   {
-    DBUG_ASSERT(is_relay_log);
+    assert(is_relay_log);
     previous_gtid_set_relaylog= previous_gtid_set_param;
   }
   /**
@@ -665,7 +671,8 @@ private:
   int process_flush_stage_queue(my_off_t *total_bytes_var, bool *rotate_var,
                                 THD **out_queue_var);
   int ordered_commit(THD *thd, bool all, bool skip_commit = false);
-  void handle_binlog_flush_or_sync_error(THD *thd, bool need_lock_log);
+  void handle_binlog_flush_or_sync_error(THD *thd, bool need_lock_log,
+                                         const char *message);
 public:
   int open_binlog(const char *opt_name);
   void close();
@@ -690,18 +697,7 @@ public:
   {
     bytes_written = 0;
   }
-  void harvest_bytes_written(ulonglong* counter)
-  {
-#ifndef DBUG_OFF
-    char buf1[22],buf2[22];
-#endif
-    DBUG_ENTER("harvest_bytes_written");
-    (*counter)+=bytes_written;
-    DBUG_PRINT("info",("counter: %s  bytes_written: %s", llstr(*counter,buf1),
-		       llstr(bytes_written,buf2)));
-    bytes_written=0;
-    DBUG_VOID_RETURN;
-  }
+  void harvest_bytes_written(Relay_log_info *rli, bool need_log_space_lock);
   void set_max_size(ulong max_size_arg);
   void signal_update()
   {
@@ -728,10 +724,10 @@ public:
     }
   }
 
-  void update_binlog_end_pos(my_off_t pos)
+  void update_binlog_end_pos(const char *file, my_off_t pos)
   {
     lock_binlog_end_pos();
-    if (pos > binlog_end_pos)
+    if (is_active(file) && pos > binlog_end_pos)
       binlog_end_pos= pos;
     signal_update();
     unlock_binlog_end_pos();
@@ -789,16 +785,18 @@ public:
      Gtid_log_event and BEGIN, COMMIT automatically.
 
      It is aimed to handle cases of "background" logging where a statement is
-     logged indirectly, like "DELETE FROM a_memory_table". So don't use it on any
+     logged indirectly, like "TRUNCATE TABLE a_memory_table". So don't use it on any
      normal statement.
 
      @param[IN] thd  the THD object of current thread.
-     @param[IN] stmt the DELETE statement.
-     @param[IN] stmt_len the length of DELETE statement.
+     @param[IN] stmt the DML statement.
+     @param[IN] stmt_len the length of the DML statement.
+     @param[IN] sql_command the type of SQL command.
 
      @return Returns false if succeeds, otherwise true is returned.
   */
-  bool write_dml_directly(THD* thd, const char *stmt, size_t stmt_len);
+  bool write_stmt_directly(THD* thd, const char *stmt, size_t stmt_len,
+                          enum enum_sql_command sql_command);
 
   void set_write_error(THD *thd, bool is_transactional);
   bool check_write_error(THD *thd);
@@ -887,6 +885,55 @@ public:
   inline IO_CACHE *get_index_file() { return &index_file;}
   inline uint32 get_open_count() { return open_count; }
 
+  /**
+    Function to report the missing GTIDs.
+
+    This function logs the missing transactions on master to its error log
+    as a warning. If the missing GTIDs are too long to print in a message,
+    it suggests the steps to extract the missing transactions.
+
+    This function also informs slave about the GTID set sent by the slave,
+    transactions missing on the master and few suggestions to recover from
+    the error. This message shall be wrapped by
+    ER_MASTER_FATAL_ERROR_READING_BINLOG on slave and will be logged as an
+    error.
+
+    This function will be called from mysql_binlog_send() function.
+
+    @param slave_executed_gtid_set     GTID set executed by slave
+    @param errmsg                      Pointer to the error message
+
+    @return void
+  */
+  void report_missing_purged_gtids(const Gtid_set *slave_executed_gtid_set,
+                                   std::string &errmsg);
+
+  /**
+    Function to report the missing GTIDs.
+
+    This function logs the missing transactions on master to its error log
+    as a warning. If the missing GTIDs are too long to print in a message,
+    it suggests the steps to extract the missing transactions.
+
+    This function also informs slave about the GTID set sent by the slave,
+    transactions missing on the master and few suggestions to recover from
+    the error. This message shall be wrapped by
+    ER_MASTER_FATAL_ERROR_READING_BINLOG on slave and will be logged as an
+    error.
+
+    This function will be called from find_first_log_not_in_gtid_set()
+    function.
+
+    @param previous_gtid_set           Previous GTID set found
+    @param slave_executed_gtid_set     GTID set executed by slave
+    @param errmsg                      Pointer to the error message
+
+    @return void
+  */
+  void report_missing_gtids(const Gtid_set *previous_gtid_set,
+                            const Gtid_set *slave_executed_gtid_set,
+                            std::string &errmsg);
+  static const int MAX_RETRIES_FOR_DELETE_RENAME_FAILURE= 5;
   /*
     It is called by the threads(e.g. dump thread) which want to read
     hot log without LOCK_log protection.
@@ -934,6 +981,26 @@ typedef struct st_load_file_info
 extern MYSQL_PLUGIN_IMPORT MYSQL_BIN_LOG mysql_bin_log;
 
 /**
+  Check if the the transaction is empty.
+
+  @param thd The client thread that executed the current statement.
+
+  @retval true No changes found in any storage engine
+  @retval false Otherwise.
+
+**/
+bool is_transaction_empty(THD* thd);
+/**
+  Check if the transaction has no rw flag set for any of the storage engines.
+
+  @param thd The client thread that executed the current statement.
+  @param trx_scope The transaction scope to look into.
+
+  @retval the number of engines which have actual changes.
+ */
+int check_trx_rw_engines(THD *thd, Transaction_ctx::enum_trx_scope trx_scope);
+
+/**
   Check if at least one of transacaction and statement binlog caches contains
   an empty transaction, other one is empty or contains an empty transaction,
   which has two binlog events "BEGIN" and "COMMIT".
@@ -948,6 +1015,14 @@ extern MYSQL_PLUGIN_IMPORT MYSQL_BIN_LOG mysql_bin_log;
 bool is_empty_transaction_in_binlog_cache(const THD* thd);
 bool trans_has_updated_trans_table(const THD* thd);
 bool stmt_has_updated_trans_table(Ha_trx_info* ha_list);
+/**
+  This function checks if the transaction has no operation dml.
+
+  @param ha_list Registered storage engine handler list.
+  @return true  if the transaction has no operation dml.
+          false otherwise.
+*/
+bool trans_has_noop_dml(Ha_trx_info* ha_list);
 bool ending_trans(THD* thd, const bool all);
 bool ending_single_stmt_trans(THD* thd, const bool all);
 bool trans_cannot_safely_rollback(const THD* thd);
@@ -999,7 +1074,7 @@ inline bool normalize_binlog_name(char *to, const char *from, bool is_relay_log)
   char *ptr= (char*) from;
   char *opt_name= is_relay_log ? opt_relay_logname : opt_bin_logname;
 
-  DBUG_ASSERT(from);
+  assert(from);
 
   /* opt_name is not null and not empty and from is a relative path */
   if (opt_name && opt_name[0] && from && !test_if_hard_path(from))
@@ -1027,7 +1102,7 @@ inline bool normalize_binlog_name(char *to, const char *from, bool is_relay_log)
     }
   }
 
-  DBUG_ASSERT(ptr);
+  assert(ptr);
   if (ptr)
   {
     size_t length= strlen(ptr);

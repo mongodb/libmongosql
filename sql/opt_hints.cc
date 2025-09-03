@@ -1,13 +1,20 @@
-/* Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -175,7 +182,7 @@ PT_hint *Opt_hints_global::get_complex_hints(opt_hints_enum type)
   if (type == MAX_EXEC_TIME_HINT_ENUM)
     return max_exec_time;
 
-  DBUG_ASSERT(0);
+  assert(0);
   return NULL;
 }
 
@@ -200,7 +207,7 @@ PT_hint *Opt_hints_qb::get_complex_hints(opt_hints_enum type)
   if (type == SUBQUERY_HINT_ENUM)
     return subquery_hint;
 
-  DBUG_ASSERT(0);
+  assert(0);
   return NULL;
 }
 
@@ -337,7 +344,7 @@ static bool get_hint_state(Opt_hints *hint,
                            opt_hints_enum type_arg,
                            bool *ret_val)
 {
-  DBUG_ASSERT(parent_hint);
+  assert(parent_hint);
 
   if (opt_hint_info[type_arg].switch_hint)
   {
@@ -356,7 +363,7 @@ static bool get_hint_state(Opt_hints *hint,
   else
   {
     /* Complex hint, not implemented atm */
-    DBUG_ASSERT(0);
+    assert(0);
   }
   return false;
 }

@@ -1,13 +1,20 @@
-/* Copyright (c) 2005, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2005, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -18,6 +25,9 @@
 
 #include "my_global.h"
 #include "auth/sql_security_ctx.h"  // Security_context
+
+/* max size of log messages (error log, plugins' logging, general log) */
+static const uint MAX_LOG_BUFFER_SIZE= 1024;
 
 struct TABLE_LIST;
 
@@ -102,7 +112,7 @@ class File_query_log
 
   ~File_query_log()
   {
-    DBUG_ASSERT(!is_open());
+    assert(!is_open());
     mysql_mutex_destroy(&LOCK_log);
   }
 
@@ -363,7 +373,7 @@ private:
   {
     if (log_type == QUERY_LOG_SLOW)
       return &mysql_slow_log;
-    DBUG_ASSERT(log_type == QUERY_LOG_GENERAL);
+    assert(log_type == QUERY_LOG_GENERAL);
     return &mysql_general_log;
   }
 
@@ -428,7 +438,7 @@ public:
       return (opt_slow_log && (log_output_options & LOG_TABLE));
     else if (log_type == QUERY_LOG_GENERAL)
       return (opt_general_log && (log_output_options & LOG_TABLE));
-    DBUG_ASSERT(false);
+    assert(false);
     return false;                             /* make compiler happy */
   }
 
@@ -902,8 +912,9 @@ void init_error_log();
   have been buffered by calling flush_error_log_messages().
 
   @param filename        Name of error log file
+  @param get_lock        Should we acquire LOCK_error_log?
 */
-bool open_error_log(const char *filename);
+bool open_error_log(const char *filename, bool get_lock);
 
 /**
   Free any error log resources.
@@ -958,4 +969,18 @@ bool log_syslog_find_facility(char *f, SYSLOG_FACILITY *rsf);
 bool log_syslog_init();
 void log_syslog_exit();
 
+/* 26 for regular timestamp, plus 7 (".123456") when using micro-seconds */
+static const int iso8601_size = 33;
+
+/**
+  Make and return an ISO 8601 / RFC 3339 compliant timestamp.
+  Heeds log_timestamps.
+
+  @param buf       A buffer of at least 26 bytes to store the timestamp in
+                   (19 + tzinfo tail + \0)
+  @param seconds   Seconds since the epoch, or 0 for "now"
+
+  @return          length of timestamp (excluding \0)
+*/
+int make_iso8601_timestamp(char *buf, ulonglong utime = 0);
 #endif /* LOG_H */

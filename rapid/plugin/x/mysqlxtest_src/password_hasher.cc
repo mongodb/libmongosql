@@ -1,15 +1,21 @@
 /*
- * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2015, 2023, Oracle and/or its affiliates.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; version 2 of the
- * License.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License, version 2.0,
+ * as published by the Free Software Foundation.
+ *
+ * This program is also distributed with certain software (including
+ * but not limited to OpenSSL) that is licensed under separate terms,
+ * as designated in a particular file or component or in included license
+ * documentation.  The authors of MySQL hereby grant you an additional
+ * permission to link the program and your derivative works with the
+ * separately licensed software that they have included with MySQL.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License, version 2.0, for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
@@ -18,13 +24,8 @@
  */
 
 
-#ifdef HAVE_YASSL
-#include <sha.hpp>
-#include <openssl/ssl.h>
-#else
 #include <openssl/sha.h>
 #include <openssl/rand.h>
-#endif
 
 #include <stdexcept>
 #include <cstring>
@@ -131,11 +132,7 @@ std::string Password_hasher::generate_user_salt()
   char *buffer = &result[0];
   char *end    = buffer + result.length() - 1;
 
-#ifdef HAVE_YASSL
-  yaSSL::RAND_bytes((unsigned char *) buffer, SCRAMBLE_LENGTH);
-#else
   RAND_bytes((unsigned char *) buffer, SCRAMBLE_LENGTH);
-#endif
 
   /* Sequence must be a legal UTF8 string */
   for (; buffer < end; buffer++)
@@ -154,7 +151,7 @@ bool Password_hasher::check_scramble_mysql41_hash(const char *scramble_arg, cons
   char buf[MYSQL41_HASH_SIZE];
   uint8_t hash_stage2_reassured[MYSQL41_HASH_SIZE];
 
-  DBUG_ASSERT(MYSQL41_HASH_SIZE == SCRAMBLE_LENGTH);
+  assert(MYSQL41_HASH_SIZE == SCRAMBLE_LENGTH);
   /* create key to encrypt scramble */
   compute_mysql41_hash_multi((uint8_t *)buf, message, SCRAMBLE_LENGTH, (const char *) hash_stage2, MYSQL41_HASH_SIZE);
 
@@ -185,7 +182,7 @@ std::string Password_hasher::scramble(const char *message, const char *password)
 
   result.at(SCRAMBLE_LENGTH - 1) = '\0';
 
-  DBUG_ASSERT(MYSQL41_HASH_SIZE == SCRAMBLE_LENGTH);
+  assert(MYSQL41_HASH_SIZE == SCRAMBLE_LENGTH);
 
   /* Two stage SHA1 hash of the pwd */
   compute_two_stage_mysql41_hash(password, strlen(password),

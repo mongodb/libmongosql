@@ -1,14 +1,22 @@
 /*****************************************************************************
 
-Copyright (c) 2014, 2016, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
-This program is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation; version 2 of the License.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License, version 2.0,
+as published by the Free Software Foundation.
 
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is also distributed with certain software (including
+but not limited to OpenSSL) that is licensed under separate terms,
+as designated in a particular file or component or in included license
+documentation.  The authors of MySQL hereby grant you an additional
+permission to link the program and your derivative works with the
+separately licensed software that they have included with MySQL.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License, version 2.0, for more details.
 
 You should have received a copy of the GNU General Public License along with
 this program; if not, write to the Free Software Foundation, Inc.,
@@ -50,7 +58,11 @@ PageBulk::init()
 	mtr = static_cast<mtr_t*>(
 		mem_heap_alloc(m_heap, sizeof(mtr_t)));
 	mtr_start(mtr);
-	mtr_x_lock(dict_index_get_lock(m_index), mtr);
+
+	if (!dict_index_is_online_ddl(m_index)) {
+		mtr_x_lock(dict_index_get_lock(m_index), mtr);
+	}
+
 	mtr_set_log_mode(mtr, MTR_LOG_NO_REDO);
 	mtr_set_flush_observer(mtr, m_flush_observer);
 
@@ -177,7 +189,8 @@ PageBulk::insert(
 		ulint*	old_offsets = rec_get_offsets(
 			old_rec, m_index, NULL,	ULINT_UNDEFINED, &m_heap);
 
-		ut_ad(cmp_rec_rec(rec, old_rec, offsets, old_offsets, m_index)
+		ut_ad(cmp_rec_rec(rec, old_rec, offsets, old_offsets, m_index,
+				  page_is_spatial_non_leaf(old_rec, m_index))
 		      > 0);
 	}
 
@@ -581,6 +594,7 @@ void
 PageBulk::release()
 {
 	ut_ad(!dict_index_is_spatial(m_index));
+	ut_ad(m_block->page.buf_fix_count > 0);
 
 	/* We fix the block because we will re-pin it soon. */
 	buf_block_buf_fix_inc(m_block, __FILE__, __LINE__);
@@ -598,9 +612,15 @@ PageBulk::latch()
 	ibool	ret;
 
 	mtr_start(m_mtr);
-	mtr_x_lock(dict_index_get_lock(m_index), m_mtr);
+
+	if (!dict_index_is_online_ddl(m_index)) {
+		mtr_x_lock(dict_index_get_lock(m_index), m_mtr);
+	}
+
 	mtr_set_log_mode(m_mtr, MTR_LOG_NO_REDO);
 	mtr_set_flush_observer(m_mtr, m_flush_observer);
+
+	ut_ad(m_block->page.buf_fix_count > 0);
 
 	/* TODO: need a simple and wait version of buf_page_optimistic_get. */
 	ret = buf_page_optimistic_get(RW_X_LATCH, m_block, m_modify_clock,
@@ -617,9 +637,35 @@ PageBulk::latch()
 	}
 
 	buf_block_buf_fix_dec(m_block);
+	/*
+	The caller is going to use the m_block, so it needs to be buffer-fixed even
+	after the decrement above. This works like this:
+	release(){ //initially buf_fix_count == N > 0
+		buf_fix_count++ // N+1
+		mtr_commit(){
+			buf_fix_count-- // N
+		}
+	}//at the end buf_fix_count == N > 0
+	latch(){//initially buf_fix_count == M > 0
+		buf_page_get_gen/buf_page_optimistic_get internally(){
+			buf_fix_count++ // M+1
+		}
+		buf_fix_count-- // M
+	}//at the end buf_fix_count == M > 0
+	*/
+	ut_ad(m_block->page.buf_fix_count > 0);
 
 	ut_ad(m_cur_rec > m_page && m_cur_rec < m_heap_top);
 }
+
+#ifdef UNIV_DEBUG
+/* Check if an index is locked */
+bool PageBulk::isIndexXLocked() {
+	return (dict_index_is_online_ddl(m_index) &&
+		mtr_memo_contains_flagged(m_mtr, dict_index_get_lock(m_index),
+			MTR_MEMO_X_LOCK | MTR_MEMO_SX_LOCK));
+}
+#endif // UNIV_DEBUG
 
 /** Split a page
 @param[in]	page_bulk	page to split
@@ -695,6 +741,16 @@ BtrBulk::pageCommit(
 		page_bulk->setNext(FIL_NULL);
 	}
 
+	/* Assert that no locks are held during bulk load operation
+	in case of a online ddl operation. Insert thread acquires index->lock
+	to check the online status of index. During bulk load index,
+	there are no concurrent insert of reads and hence, there is no
+	need to acquire a lock in that case. */
+	ut_ad(!page_bulk->isIndexXLocked());
+
+	DBUG_EXECUTE_IF("innodb_bulk_load_sleep",
+			os_thread_sleep(1000000););
+
 	/* Compress page if it's a compressed table. */
 	if (page_bulk->getPageZip() != NULL && !page_bulk->compress()) {
 		return(pageSplit(page_bulk, next_page_bulk));
@@ -729,29 +785,20 @@ BtrBulk::logFreeCheck()
 	}
 }
 
-/** Release all latches */
+/** Release latch on the rightmost leaf page in the index tree */
 void
 BtrBulk::release()
 {
-	ut_ad(m_root_level + 1 == m_page_bulks->size());
-
-	for (ulint level = 0; level <= m_root_level; level++) {
-		PageBulk*    page_bulk = m_page_bulks->at(level);
-
-		page_bulk->release();
-	}
+	PageBulk* page_bulk = m_page_bulks->at(0);
+	page_bulk->release();
 }
 
-/** Re-latch all latches */
+/** Re-latch latch on the rightmost leaf page in the index tree */
 void
 BtrBulk::latch()
 {
-	ut_ad(m_root_level + 1 == m_page_bulks->size());
-
-	for (ulint level = 0; level <= m_root_level; level++) {
-		PageBulk*    page_bulk = m_page_bulks->at(level);
-		page_bulk->latch();
-	}
+	PageBulk* page_bulk = m_page_bulks->at(0);
+	page_bulk->latch();
 }
 
 /** Insert a tuple to page in a level
@@ -778,16 +825,23 @@ BtrBulk::insert(
 			return(err);
 		}
 
+		DEBUG_SYNC_C("bulk_load_insert");
 		m_page_bulks->push_back(new_page_bulk);
 		ut_ad(level + 1 == m_page_bulks->size());
 		m_root_level = level;
 
 		is_left_most = true;
+		if (level > 0) {
+			new_page_bulk->release();
+		}
 	}
 
 	ut_ad(m_page_bulks->size() > level);
 
 	PageBulk*	page_bulk = m_page_bulks->at(level);
+	if (level > 0) {
+		page_bulk->latch();
+	}
 
 	if (is_left_most && level > 0 && page_bulk->getRecNo() == 0) {
 		/* The node pointer must be marked as the predefined minimum
@@ -809,7 +863,8 @@ BtrBulk::insert(
 		big_rec = dtuple_convert_big_rec(m_index, 0, tuple, &n_ext);
 
 		if (big_rec == NULL) {
-			return(DB_TOO_BIG_RECORD);
+			err = DB_TOO_BIG_RECORD;
+			goto func_exit;
 		}
 
 		rec_size = rec_get_converted_size(m_index, tuple, n_ext);
@@ -862,7 +917,6 @@ BtrBulk::insert(
 
 			logFreeCheck();
 		}
-
 	}
 
 	/* Convert tuple to rec. */
@@ -877,26 +931,15 @@ BtrBulk::insert(
 		ut_ad(dict_index_is_clust(m_index));
 		ut_ad(page_bulk->getLevel() == 0);
 		ut_ad(page_bulk == m_page_bulks->at(0));
-
-		/* Release all latched but leaf node. */
-		for (ulint level = 1; level <= m_root_level; level++) {
-			PageBulk*    page_bulk = m_page_bulks->at(level);
-
-			page_bulk->release();
-		}
-
 		err = page_bulk->storeExt(big_rec, offsets);
-
-		/* Latch */
-		for (ulint level = 1; level <= m_root_level; level++) {
-			PageBulk*    page_bulk = m_page_bulks->at(level);
-			page_bulk->latch();
-		}
 	}
 
 func_exit:
 	if (big_rec != NULL) {
 		dtuple_convert_back_big_rec(m_index, tuple, big_rec);
+	}
+	if (level > 0) {
+		page_bulk->release();
 	}
 
 	return(err);
@@ -914,6 +957,11 @@ BtrBulk::finish(dberr_t	err)
 
 	ut_ad(!dict_table_is_temporary(m_index->table));
 
+#ifdef UNIV_DEBUG
+	/* Assert that the index online status has not changed */
+	ut_ad(m_index->online_status == m_index_online);
+#endif // UNIV_DEBUG
+
 	if (m_page_bulks->size() == 0) {
 		/* The table is empty. The root page of the index tree
 		is already in a consistent state. No need to flush. */
@@ -925,6 +973,9 @@ BtrBulk::finish(dberr_t	err)
 	/* Finish all page bulks */
 	for (ulint level = 0; level <= m_root_level; level++) {
 		PageBulk*	page_bulk = m_page_bulks->at(level);
+		if (level > 0) {
+			page_bulk->latch();
+		}
 
 		last_page_no = page_bulk->getPageNo();
 

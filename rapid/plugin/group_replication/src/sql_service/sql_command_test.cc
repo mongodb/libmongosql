@@ -1,13 +1,20 @@
-/* Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -45,7 +52,7 @@ void check_sql_command_create(Sql_service_interface *srvi)
   {
     srvi->execute_query("SHOW TABLES IN test;", &rset);
     std::string str= "t1";
-    DBUG_ASSERT(rset.getString(0) == str);
+    assert(rset.getString(0) == str);
   }
   else
   {
@@ -68,10 +75,10 @@ void check_sql_command_insert(Sql_service_interface *srvi)
     insert_values.push_back("1");
     insert_values.push_back("2");
     insert_values.push_back("3");
-    DBUG_ASSERT(rset.get_rows() == 3);
+    assert(rset.get_rows() == 3);
     while (i < rset.get_rows())
     {
-      DBUG_ASSERT(rset.getString(0) == insert_values[i]);
+      assert(rset.getString(0) == insert_values[i]);
       rset.next();
       i++;
     }
@@ -98,10 +105,10 @@ void check_sql_command_update(Sql_service_interface *srvi)
     update_values.push_back("4");
     update_values.push_back("5");
     update_values.push_back("6");
-    DBUG_ASSERT(rset.get_rows() == 3);
+    assert(rset.get_rows() == 3);
     while (i < rset.get_rows())
     {
-      DBUG_ASSERT(rset.getString(0) == update_values[i]);
+      assert(rset.getString(0) == update_values[i]);
       rset.next();
       i++;
     }
@@ -121,7 +128,7 @@ void check_sql_command_drop(Sql_service_interface *srvi)
   {
     srvi->execute_query("SELECT TABLES IN test", &rset);
     std::string str= "t1";
-    DBUG_ASSERT(rset.get_rows() == 0);
+    assert(rset.get_rows() == 0);
   }
   else
   {
@@ -144,7 +151,7 @@ int sql_command_check()
   }
 
   error= srvi->open_session();
-  DBUG_ASSERT(!error);
+  assert(!error);
 
   /* Case 1 */
 

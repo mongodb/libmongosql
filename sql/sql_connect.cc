@@ -1,14 +1,21 @@
 /*
-   Copyright (c) 2007, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2007, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -77,8 +84,8 @@ int get_or_create_user_conn(THD *thd, const char *user,
   char temp_user[USER_HOST_BUFF_SIZE];
   struct  user_conn *uc;
 
-  DBUG_ASSERT(user != 0);
-  DBUG_ASSERT(host != 0);
+  assert(user != 0);
+  assert(host != 0);
 
   user_len= strlen(user);
   temp_len= (my_stpcpy(my_stpcpy(temp_user, user)+1, host) - temp_user)+1;
@@ -218,7 +225,7 @@ void decrease_user_connections(USER_CONN *uc)
 {
   DBUG_ENTER("decrease_user_connections");
   mysql_mutex_lock(&LOCK_user_conn);
-  DBUG_ASSERT(uc->connections);
+  assert(uc->connections);
   if (!--uc->connections && !mqh_used)
   {
     /* Last connection for user; Delete it */
@@ -244,7 +251,7 @@ void release_user_connection(THD *thd)
   if (uc)
   {
     mysql_mutex_lock(&LOCK_user_conn);
-    DBUG_ASSERT(uc->connections > 0);
+    assert(uc->connections > 0);
     thd->decrement_user_connections_counter();
     if (!uc->connections && !mqh_used)
     {
@@ -270,7 +277,7 @@ bool check_mqh(THD *thd, uint check_command)
   bool error= 0;
   const USER_CONN *uc=thd->get_user_connect();
   DBUG_ENTER("check_mqh");
-  DBUG_ASSERT(uc != 0);
+  assert(uc != 0);
 
   mysql_mutex_lock(&LOCK_user_conn);
 
@@ -508,6 +515,7 @@ static int check_connection(THD *thd)
     LEX_CSTRING main_sctx_ip;
 
     peer_rc= vio_peer_addr(net->vio, ip, &thd->peer_port, NI_MAXHOST);
+    mysql_thread_set_peer_port(thd->peer_port);
 
     /*
     ===========================================================================
@@ -706,6 +714,17 @@ static int check_connection(THD *thd)
   */
   thd->set_ssl(net->vio);
 
+  if (net->vio->ssl_arg) {
+    int version = SSL_version((SSL *)net->vio->ssl_arg);
+    if (version == TLS1_VERSION || version == TLS1_1_VERSION) {
+      Security_context *sctx = thd->security_context();
+      sql_print_warning(ER(ER_DEPRECATED_TLS_VERSION_SESSION),
+                        SSL_get_version((SSL *)net->vio->ssl_arg),
+                        sctx->priv_user().str, sctx->priv_host().str,
+                        sctx->host_or_ip().str, sctx->user().str);
+    }
+  }
+
   return auth_rc;
 }
 
@@ -734,7 +753,7 @@ static bool login_connection(THD *thd)
                       thd->thread_id()));
 
   /* Use "connect_timeout" value during connection phase */
-  thd->get_protocol_classic()->set_read_timeout(connect_timeout);
+  thd->get_protocol_classic()->set_read_timeout(connect_timeout, TRUE);
   thd->get_protocol_classic()->set_write_timeout(connect_timeout);
 
   error= check_connection(thd);

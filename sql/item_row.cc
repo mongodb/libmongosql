@@ -1,13 +1,20 @@
-/* Copyright (c) 2002, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2002, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -84,14 +91,14 @@ void Item_row::illegal_method_call(const char *method)
 {
   DBUG_ENTER("Item_row::illegal_method_call");
   DBUG_PRINT("error", ("!!! %s method was called for row item", method));
-  DBUG_ASSERT(0);
+  assert(0);
   my_error(ER_OPERAND_COLUMNS, MYF(0), 1);
   DBUG_VOID_RETURN;
 }
 
 bool Item_row::fix_fields(THD *thd, Item **ref)
 {
-  DBUG_ASSERT(fixed == 0);
+  assert(fixed == 0);
   null_value= 0;
   maybe_null= 0;
   Item **arg, **arg_end;
@@ -217,7 +224,7 @@ bool Item_row::walk(Item_processor processor, enum_walk walk, uchar *arg)
 
 Item *Item_row::transform(Item_transformer transformer, uchar *arg)
 {
-  DBUG_ASSERT(!current_thd->stmt_arena->is_stmt_prepare());
+  assert(!current_thd->stmt_arena->is_stmt_prepare());
 
   for (uint i= 0; i < arg_count; i++)
   {

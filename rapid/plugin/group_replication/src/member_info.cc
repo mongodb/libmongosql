@@ -1,13 +1,20 @@
-/* Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -41,7 +48,7 @@ Group_member_info(char* hostname_arg,
     gtid_assignment_block_size(gtid_assignment_block_size_arg),
     unreachable(false),
     role(role_arg),
-    configuration_flags(0), conflict_detection_enable(false),
+    configuration_flags(0), conflict_detection_enable(!in_single_primary_mode),
     member_weight(member_weight_arg),
     lower_case_table_names(lower_case_table_names_arg)
 {
@@ -159,7 +166,7 @@ Group_member_info::encode_payload(std::vector<unsigned char>* buffer) const
                            member_weight_aux);
 
   uint16 lower_case_table_names_aux= static_cast <uint16> (lower_case_table_names);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   if (lower_case_table_names != SKIP_ENCODING_LOWER_CASE_TABLE_NAMES)
 #endif
   encode_payload_item_int2(buffer, PIT_LOWER_CASE_TABLE_NAME,
@@ -649,7 +656,7 @@ get_group_member_info_by_member_id(Gcs_member_identifier idx)
   {
     if((*it).second->get_gcs_member_id() == idx)
     {
-      member= (*it).second;
+      member= new Group_member_info(*(*it).second);
       break;
     }
   }
@@ -729,6 +736,34 @@ update_member_status(const string& uuid,
   if(it != members->end())
   {
     (*it).second->update_recovery_status(new_status);
+  }
+
+  mysql_mutex_unlock(&update_lock);
+}
+
+void
+Group_member_info_manager::
+set_member_unreachable(const std::string &uuid)
+{
+  mysql_mutex_lock(&update_lock);
+
+  map<string, Group_member_info*>::iterator it = members->find(uuid);
+  if (it != members->end()) {
+    (*it).second->set_unreachable();
+  }
+
+  mysql_mutex_unlock(&update_lock);
+}
+
+void
+Group_member_info_manager::
+set_member_reachable(const std::string &uuid)
+{
+  mysql_mutex_lock(&update_lock);
+
+  map<string, Group_member_info*>::iterator it = members->find(uuid);
+  if (it != members->end()) {
+    (*it).second->set_reachable();
   }
 
   mysql_mutex_unlock(&update_lock);
@@ -844,7 +879,7 @@ get_primary_member_uuid(std::string &primary_member_uuid)
     Group_member_info* info= (*it).second;
     if (info->get_role() == Group_member_info::MEMBER_ROLE_PRIMARY)
     {
-      DBUG_ASSERT(primary_member_uuid.empty());
+      assert(primary_member_uuid.empty());
       primary_member_uuid =info->get_uuid();
     }
   }
@@ -880,16 +915,17 @@ Group_member_info_manager::get_string_current_view_active_hosts() const
 {
   std::stringstream hosts_string;
   map<string, Group_member_info*>::iterator all_members_it= members->begin();
+  bool first_entry = true;
 
   while (all_members_it != members->end())
   {
     Group_member_info* member_info= (*all_members_it).second;
-    if (member_info->get_recovery_status() == Group_member_info::MEMBER_ONLINE ||
-        member_info->get_recovery_status() == Group_member_info::MEMBER_IN_RECOVERY)
-      hosts_string << member_info->get_hostname() << ":" << member_info->get_port();
+    if (!first_entry)
+      hosts_string << ", ";
+    else
+      first_entry = false;
+    hosts_string << member_info->get_hostname() << ":" << member_info->get_port();
     all_members_it++;
-    if (all_members_it != members->end())
-      hosts_string<<", ";
   }
 
   return hosts_string.str();

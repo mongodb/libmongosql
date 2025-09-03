@@ -1,13 +1,20 @@
-/* Copyright (c) 2004, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2004, 2023, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; version 2 of the License.
+  it under the terms of the GNU General Public License, version 2.0,
+  as published by the Free Software Foundation.
+
+  This program is also distributed with certain software (including
+  but not limited to OpenSSL) that is licensed under separate terms,
+  as designated in a particular file or component or in included license
+  documentation.  The authors of MySQL hereby grant you an additional
+  permission to link the program and your derivative works with the
+  separately licensed software that they have included with MySQL.
 
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  GNU General Public License, version 2.0, for more details.
 
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software
@@ -1425,8 +1432,9 @@ bool ha_federated::create_where_from_key(String *to,
           {
             goto err;
           }
+          break;
         }
-        break;
+        // Fall through
       case HA_READ_KEY_OR_NEXT:
         DBUG_PRINT("info", ("federated HA_READ_KEY_OR_NEXT %d", i));
         if (emit_key_part_name(&tmp, key_part) ||
@@ -1444,8 +1452,9 @@ bool ha_federated::create_where_from_key(String *to,
               emit_key_part_element(&tmp, key_part, needs_quotes, 0, ptr,
                                     part_length))
             goto err;
+          break;
         }
-        break;
+        // Fall through
       case HA_READ_KEY_OR_PREV:
         DBUG_PRINT("info", ("federated HA_READ_KEY_OR_PREV %d", i));
         if (emit_key_part_name(&tmp, key_part) ||
@@ -1465,7 +1474,7 @@ prepare_for_next_key_part:
       if (store_length >= length)
         break;
       DBUG_PRINT("info", ("remainder %d", remainder));
-      DBUG_ASSERT(remainder > 1);
+      assert(remainder > 1);
       length-= store_length;
       /*
         For nullable columns, null-byte is already skipped before, that is
@@ -1657,7 +1666,7 @@ int ha_federated::open(const char *name, int mode, uint test_if_locked)
     DBUG_RETURN(1);
   thr_lock_data_init(&share->lock, &lock, NULL);
 
-  DBUG_ASSERT(mysql == NULL);
+  assert(mysql == NULL);
 
   ref_length= sizeof(MYSQL_RES *) + sizeof(MYSQL_ROW_OFFSET);
   DBUG_PRINT("info", ("ref_length: %u", ref_length));
@@ -2525,7 +2534,7 @@ int ha_federated::read_range_first(const key_range *start_key,
   DBUG_ENTER("ha_federated::read_range_first");
   MYSQL_INDEX_READ_ROW_START(table_share->db.str, table_share->table_name.str);
 
-  DBUG_ASSERT(!(start_key == NULL && end_key == NULL));
+  assert(!(start_key == NULL && end_key == NULL));
 
   sql_query.length(0);
   sql_query.append(share->select_query);
@@ -2761,7 +2770,7 @@ void ha_federated::position(const uchar *record MY_ATTRIBUTE ((unused)))
 {
   DBUG_ENTER("ha_federated::position");
   
-  DBUG_ASSERT(stored_result);
+  assert(stored_result);
 
   position_called= TRUE;
   /* Store result set address. */
@@ -2794,7 +2803,7 @@ int ha_federated::rnd_pos(uchar *buf, uchar *pos)
 
   /* Get stored result set. */
   memcpy(&result, pos, sizeof(MYSQL_RES *));
-  DBUG_ASSERT(result);
+  assert(result);
   /* Set data cursor position. */
   memcpy(&result->data_cursor, pos + sizeof(MYSQL_RES *),
          sizeof(MYSQL_ROW_OFFSET));
@@ -3183,7 +3192,7 @@ int ha_federated::real_connect()
   */
   mysql_mutex_assert_not_owner(&LOCK_open);
 
-  DBUG_ASSERT(mysql == NULL);
+  assert(mysql == NULL);
 
   if (!(mysql= mysql_init(NULL)))
   {
@@ -3444,6 +3453,23 @@ int ha_federated::execute_simple_query(const char *query, int len)
     DBUG_RETURN(stash_remote_error());
   }
   DBUG_RETURN(0);
+}
+
+
+int ha_federated::rnd_pos_by_record(uchar *record) {
+  int error;
+  assert(table_flags() & HA_PRIMARY_KEY_REQUIRED_FOR_POSITION);
+
+  error = ha_rnd_init(false);
+  if (error != 0) return error;
+
+  if (stored_result) {
+    position(record);
+    error = ha_rnd_pos(record, ref);
+  }
+
+  ha_rnd_end();
+  return error;
 }
 
 struct st_mysql_storage_engine federated_storage_engine=

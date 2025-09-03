@@ -1,13 +1,20 @@
-/* Copyright (c) 2002, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2002, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -215,7 +222,7 @@ struct MBR
       same dimension.
     */
     int d= dimension();
-    DBUG_ASSERT(d >= 0 && d <= 2);
+    assert(d >= 0 && d <= 2);
 
     if (d != mbr->dimension() || d == 0 || contains(mbr) || within(mbr))
       return 0;
@@ -487,7 +494,7 @@ public:
     /* Routines to skip non-interesting data */
     void skip_unsafe(size_t nbytes)
     {
-      DBUG_ASSERT(!no_data(nbytes));
+      assert(!no_data(nbytes));
       m_data+= nbytes;
     }
     bool skip(size_t nbytes)
@@ -541,7 +548,7 @@ public:
     /* Routines to scan coordinate information */
     void scan_xy_unsafe(point_xy *p)
     {
-      DBUG_ASSERT(!no_data(POINT_DATA_SIZE));
+      assert(!no_data(POINT_DATA_SIZE));
       get_float8(&p->x);
       m_data+= SIZEOF_STORED_DOUBLE;
       get_float8(&p->y);
@@ -621,7 +628,7 @@ public:
   }
   virtual uint32 feature_dimension() const
   {
-    DBUG_ASSERT(false);
+    assert(false);
     return 0;
   }
 
@@ -737,9 +744,9 @@ public:
 
   void set_components_no_overlapped(bool b)
   {
-    DBUG_ASSERT(get_type() == wkb_multilinestring ||
-                get_type() == wkb_multipolygon ||
-                get_type() == wkb_geometrycollection);
+    assert(get_type() == wkb_multilinestring ||
+           get_type() == wkb_multipolygon ||
+           get_type() == wkb_geometrycollection);
     if (b)
       m_flags.props|= MULTIPOLYGON_NO_OVERLAPPED_COMPS;
     else
@@ -748,7 +755,7 @@ public:
 
   void set_props(uint16 flag)
   {
-    DBUG_ASSERT(0xfff >= flag);
+    assert(0xfff >= flag);
     m_flags.props |= flag;
   }
 
@@ -812,6 +819,16 @@ public:
   */
   class Flags_t
   {
+    void initialize_bits_to_zero()
+    {
+      bo = 0;
+      dim = 0;
+      nomem = 0;
+      geotype = 0;
+      nbytes = 0;
+      props = 0;
+      zm = 0;
+    }
   public:
     Flags_t(const Flags_t &o)
     {
@@ -822,7 +839,7 @@ public:
     Flags_t()
     {
       compile_time_assert(sizeof(*this) == sizeof(uint64));
-      memset(this, 0, sizeof(*this));
+      initialize_bits_to_zero();
       bo= wkb_ndr;
       dim= GEOM_DIM - 1;
       nomem= 1;
@@ -831,7 +848,7 @@ public:
     Flags_t(wkbType type, size_t len)
     {
       compile_time_assert(sizeof(*this) == sizeof(uint64));
-      memset(this, 0, sizeof(*this));
+      initialize_bits_to_zero();
       geotype= type;
       nbytes= len;
       bo= wkb_ndr;
@@ -902,14 +919,14 @@ public:
 
   void set_byte_order(Geometry::wkbByteOrder bo)
   {
-    DBUG_ASSERT(bo == Geometry::wkb_ndr);
+    assert(bo == Geometry::wkb_ndr);
     m_flags.bo= static_cast<char>(bo);
   }
 
   void set_dimension(char dim)
   {
     // Valid dim is one of [1, 2, 3, 4].
-    DBUG_ASSERT(dim >0 && dim <5);
+    assert(dim >0 && dim <5);
     m_flags.dim= dim - 1;
   }
 
@@ -991,7 +1008,7 @@ public:
 
   Geometry::wkbByteOrder get_byte_order() const
   {
-    DBUG_ASSERT(m_flags.bo == 1);
+    assert(m_flags.bo == 1);
     return Geometry::wkb_ndr;
   }
 
@@ -1124,7 +1141,7 @@ protected:
   void clear_wkb_data();
   virtual void shallow_push(const Geometry *)
   {
-    DBUG_ASSERT(false);
+    assert(false);
   }
 
 protected:
@@ -1191,7 +1208,7 @@ inline Geometry::wkbType get_wkb_geotype(const void *p0)
 {
   const char *p= static_cast<const char *>(p0);
   uint32 gt= uint4korr(p);
-  DBUG_ASSERT(Geometry::is_valid_geotype(gt));
+  assert(Geometry::is_valid_geotype(gt));
   return static_cast<Geometry::wkbType>(gt);
 }
 
@@ -1317,9 +1334,9 @@ public:
     :Geometry(ptr, nbytes, flags, srid)
   {
     set_geotype(wkb_point);
-    DBUG_ASSERT((ptr != NULL &&
-                 get_nbytes() == SIZEOF_STORED_DOUBLE * GEOM_DIM) ||
-                (ptr == NULL && get_nbytes() == 0));
+    assert((ptr != NULL &&
+            get_nbytes() == SIZEOF_STORED_DOUBLE * GEOM_DIM) ||
+           (ptr == NULL && get_nbytes() == 0));
     set_ownmem(false);
     set_bg_adapter(true);
   }
@@ -1341,10 +1358,10 @@ public:
   template <std::size_t K>
   double get() const
   {
-    DBUG_ASSERT(K < static_cast<size_t>(get_dimension()) &&
-                ((m_ptr != NULL &&
-                  get_nbytes() == SIZEOF_STORED_DOUBLE * GEOM_DIM) ||
-                 (m_ptr == NULL && get_nbytes() == 0)));
+    assert(K < static_cast<size_t>(get_dimension()) &&
+           ((m_ptr != NULL &&
+             get_nbytes() == SIZEOF_STORED_DOUBLE * GEOM_DIM) ||
+            (m_ptr == NULL && get_nbytes() == 0)));
 
     set_bg_adapter(true);
     const char *p= static_cast<char *>(m_ptr) + K * SIZEOF_STORED_DOUBLE;
@@ -1372,9 +1389,9 @@ public:
   void set(double const &value)
   {
     /* Allow assigning to others' memory. */
-    DBUG_ASSERT((m_ptr != NULL && K < static_cast<size_t>(get_dimension()) &&
-                 get_nbytes() == SIZEOF_STORED_DOUBLE * GEOM_DIM) ||
-                (!get_ownmem() && get_nbytes() == 0 && m_ptr == NULL));
+    assert((m_ptr != NULL && K < static_cast<size_t>(get_dimension()) &&
+            get_nbytes() == SIZEOF_STORED_DOUBLE * GEOM_DIM) ||
+           (!get_ownmem() && get_nbytes() == 0 && m_ptr == NULL));
     set_bg_adapter(true);
     if (m_ptr == NULL)
     {
@@ -1523,7 +1540,7 @@ public:
   /// @return True if this iterator equals to itr; False otherwise.
   bool operator==(const self &itr) const
   {
-    DBUG_ASSERT(m_owner == itr.m_owner);
+    assert(m_owner == itr.m_owner);
     return m_curidx == itr.m_curidx;
   }
 
@@ -1543,7 +1560,7 @@ public:
   /// @return True if this iterator is less than itr.
   bool operator < (const self &itr) const
   {
-    DBUG_ASSERT(m_owner == itr.m_owner);
+    assert(m_owner == itr.m_owner);
     return m_curidx < itr.m_curidx;
   }
 
@@ -1572,7 +1589,7 @@ public:
   /// @return True if this iterator is greater than itr.
   bool operator > (const self &itr) const
   {
-    DBUG_ASSERT(m_owner == itr.m_owner);
+    assert(m_owner == itr.m_owner);
     return m_curidx > itr.m_curidx;
   }
   //@} // vctitr_cmp
@@ -1725,7 +1742,7 @@ public:
   /// @return The index difference.
   difference_type operator-(const self &itr) const
   {
-    DBUG_ASSERT(m_owner == itr.m_owner);
+    assert(m_owner == itr.m_owner);
     return (m_curidx - itr.m_curidx);
   }
 
@@ -1744,9 +1761,9 @@ public:
   /// @return The reference to the element this iterator points to.
   reference operator*() const
   {
-    DBUG_ASSERT(this->m_owner != NULL && this->m_curidx >= 0 &&
-                this->m_curidx <
-                static_cast<index_type>(this->m_owner->size()));
+    assert(this->m_owner != NULL && this->m_curidx >= 0 &&
+           this->m_curidx <
+           static_cast<index_type>(this->m_owner->size()));
     return (*m_owner)[m_curidx];
   }
 
@@ -1759,9 +1776,9 @@ public:
   /// @return The address of the referenced object.
   pointer operator->() const
   {
-    DBUG_ASSERT(this->m_owner != NULL && this->m_curidx >= 0 &&
-                this->m_curidx <
-                static_cast<index_type>(this->m_owner->size()));
+    assert(this->m_owner != NULL && this->m_curidx >= 0 &&
+           this->m_curidx <
+           static_cast<index_type>(this->m_owner->size()));
     return &(*m_owner)[m_curidx];
   }
 
@@ -1778,8 +1795,8 @@ public:
     self itr= *this;
     move_by(itr, offset, false);
 
-    DBUG_ASSERT(itr.m_owner != NULL && itr.m_curidx >= 0 &&
-                itr.m_curidx < static_cast<index_type>(itr.m_owner->size()));
+    assert(itr.m_owner != NULL && itr.m_curidx >= 0 &&
+           itr.m_curidx < static_cast<index_type>(itr.m_owner->size()));
     return (*m_owner)[itr.m_curidx];
   }
   //@}
@@ -2036,9 +2053,9 @@ public:
   /// @return The reference to the element this iterator points to.
   reference operator*() const
   {
-    DBUG_ASSERT(this->m_owner != NULL && this->m_curidx >= 0 &&
-                this->m_curidx <
-                static_cast<index_type>(this->m_owner->size()));
+    assert(this->m_owner != NULL && this->m_curidx >= 0 &&
+           this->m_curidx <
+           static_cast<index_type>(this->m_owner->size()));
     return (*this->m_owner)[this->m_curidx];
   }
 
@@ -2051,9 +2068,9 @@ public:
   /// @return The address of the referenced object.
   pointer operator->() const
   {
-    DBUG_ASSERT(this->m_owner != NULL && this->m_curidx >= 0 &&
-                this->m_curidx <
-                static_cast<index_type>(this->m_owner->size()));
+    assert(this->m_owner != NULL && this->m_curidx >= 0 &&
+           this->m_curidx <
+           static_cast<index_type>(this->m_owner->size()));
     return &(*this->m_owner)[this->m_curidx];
   }
 
@@ -2068,8 +2085,8 @@ public:
   {
     self itr= *this;
     this->move_by(itr, offset, false);
-    DBUG_ASSERT(itr.m_owner != NULL && itr.m_curidx >= 0 &&
-                itr.m_curidx < static_cast<index_type>(this->m_owner->size()));
+    assert(itr.m_owner != NULL && itr.m_curidx >= 0 &&
+           itr.m_curidx < static_cast<index_type>(this->m_owner->size()));
     return (*this->m_owner)[itr.m_curidx];
   }
   //@} // funcs_val
@@ -2251,7 +2268,7 @@ public:
 
   const_reference operator[](index_type i) const
   {
-    DBUG_ASSERT(!(i < 0 || i >= (index_type)size()));
+    assert(!(i < 0 || i >= (index_type)size()));
     set_bg_adapter(true);
 
     const Geometry *p= &((*m_geo_vect)[i]);
@@ -2261,7 +2278,7 @@ public:
 
   reference operator[](index_type i)
   {
-    DBUG_ASSERT(!(i < 0 || i >= (index_type)size()));
+    assert(!(i < 0 || i >= (index_type)size()));
     set_bg_adapter(true);
 
     Geometry *p= &((*m_geo_vect)[i]);
@@ -2289,7 +2306,7 @@ public:
       exception now. We do so nonetheless for potential mis-use of exceptions
       in futher code.
     */
-#if !defined(DBUG_OFF)
+#if !defined(NDEBUG)
     try
     {
 #endif
@@ -2297,12 +2314,12 @@ public:
         return;
       if (m_geo_vect != NULL)
         clear_wkb_data();
-#if !defined(DBUG_OFF)
+#if !defined(NDEBUG)
     }
     catch (...)
     {
       // Should never throw exceptions in destructor.
-      DBUG_ASSERT(false);
+      assert(false);
     }
 #endif
   }
@@ -2447,7 +2464,7 @@ public:
 // For internal use only, only convert types, don't create rings.
 inline Gis_polygon_ring *outer_ring(const Geometry *g)
 {
-  DBUG_ASSERT(g->get_geotype() == Geometry::wkb_polygon);
+  assert(g->get_geotype() == Geometry::wkb_polygon);
   Gis_polygon_ring *out= static_cast<Gis_polygon_ring *>(g->get_ptr());
 
   return out;
@@ -2476,7 +2493,7 @@ public:
 
   ring_type &outer() const
   {
-    DBUG_ASSERT(!polygon_is_wkb_form());
+    assert(!polygon_is_wkb_form());
     set_bg_adapter(true);
     // Create outer ring if none, although read only, calller may just want
     // to traverse the outer ring if any.
@@ -2488,7 +2505,7 @@ public:
 
   inner_container_type &inners() const
   {
-    DBUG_ASSERT(!polygon_is_wkb_form());
+    assert(!polygon_is_wkb_form());
     set_bg_adapter(true);
     // Create inner rings if none, although read only, calller may just want
     // to traverse the inner rings if any.
@@ -2710,7 +2727,7 @@ public:
   bool dimension(uint32 *dim, wkb_parser *wkb) const;
   uint32 feature_dimension() const
   {
-    DBUG_ASSERT(0);
+    assert(0);
     return 0;
   }
   const Class_info *get_class_info() const;

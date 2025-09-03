@@ -1,13 +1,20 @@
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -187,7 +194,7 @@ bool init_read_record(READ_RECORD *info,THD *thd,
   DBUG_ENTER("init_read_record");
 
   // If only 'table' is given, assume no quick, no condition.
-  DBUG_ASSERT(!(table && qep_tab));
+  assert(!(table && qep_tab));
   if (!table)
     table= qep_tab->table();
 
@@ -291,7 +298,7 @@ bool init_read_record(READ_RECORD *info,THD *thd,
     if (table->sort.using_addon_fields())
     {
       DBUG_PRINT("info",("using rr_unpack_from_buffer"));
-      DBUG_ASSERT(table->sort.sorted_result_in_fsbuf);
+      assert(table->sort.sorted_result_in_fsbuf);
       info->unpack_counter= 0;
       if (table->sort.addon_fields->using_packed_addons())
         info->read_record= rr_unpack_from_buffer<true>;
@@ -587,7 +594,7 @@ template<bool Packed_addon_fields>
 static int rr_unpack_from_tempfile(READ_RECORD *info)
 {
   uchar *destination= info->rec_buf;
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   my_off_t where= my_b_tell(info->io_cache);
 #endif
   if (Packed_addon_fields)
@@ -601,8 +608,8 @@ static int rr_unpack_from_tempfile(READ_RECORD *info)
     DBUG_PRINT("info", ("rr_unpack from %llu to %p sz %u",
                         static_cast<ulonglong>(where),
                         destination, res_length));
-    DBUG_ASSERT(res_length > len_sz);
-    DBUG_ASSERT(info->table->sort.using_addon_fields());
+    assert(res_length > len_sz);
+    assert(info->table->sort.using_addon_fields());
 
     // Then read the rest of the record.
     if (my_b_read(info->io_cache, destination + len_sz, res_length - len_sz))
@@ -718,7 +725,7 @@ static int init_rr_cache(THD *thd, READ_RECORD *info)
 static int rr_cmp(const void *p_ref_length, const void *a, const void *b)
 {
   size_t ref_length= *(static_cast<size_t*>(const_cast<void*>(p_ref_length)));
-  DBUG_ASSERT(ref_length <= MAX_REFLENGTH);
+  assert(ref_length <= MAX_REFLENGTH);
   return memcmp(a, b, ref_length);
 }
 

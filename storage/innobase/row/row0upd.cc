@@ -1,14 +1,22 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2017, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2023, Oracle and/or its affiliates.
 
-This program is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation; version 2 of the License.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License, version 2.0,
+as published by the Free Software Foundation.
 
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is also distributed with certain software (including
+but not limited to OpenSSL) that is licensed under separate terms,
+as designated in a particular file or component or in included license
+documentation.  The authors of MySQL hereby grant you an additional
+permission to link the program and your derivative works with the
+separately licensed software that they have included with MySQL.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License, version 2.0, for more details.
 
 You should have received a copy of the GNU General Public License along with
 this program; if not, write to the Free Software Foundation, Inc.,
@@ -267,9 +275,10 @@ row_upd_check_references_constraints(
 			if it is interrupted. So if the foreign table is
 			undergoing a truncate, ignore the FK check. */
 
-			if (foreign_table != NULL
-			    && fil_space_is_being_truncated(
-						foreign_table->space)) {
+			if (foreign_table != NULL &&
+			   (dict_table_is_discarded(foreign_table)
+			    || fil_space_is_being_truncated(
+						foreign_table->space))) {
 				continue;
 			}
 
@@ -876,8 +885,9 @@ the equal ordering fields. NOTE: we compare the fields as binary strings!
 @param[in]	heap		memory heap from which allocated
 @param[in]	mysql_table	NULL, or mysql table object when
 				user thread invokes dml
+@param[out]	error		error number in case of failure
 @return own: update vector of differing fields, excluding roll ptr and
-trx id */
+trx id,if error is not equal to DB_SUCCESS, return NULL */
 upd_t*
 row_upd_build_difference_binary(
 	dict_index_t*	index,
@@ -887,7 +897,8 @@ row_upd_build_difference_binary(
 	bool		no_sys,
 	trx_t*		trx,
 	mem_heap_t*	heap,
-	TABLE*		mysql_table)
+	TABLE*		mysql_table,
+	dberr_t*	error)
 {
 	upd_field_t*	upd_field;
 	dfield_t*	dfield;
@@ -993,6 +1004,10 @@ row_upd_build_difference_binary(
 				update->old_vrow, col, index,
 				&v_heap, heap, NULL, thd, mysql_table,
 				NULL, NULL, NULL);
+			if (vfield == NULL) {
+				*error = DB_COMPUTE_VALUE_FAILED;
+				return(NULL);
+			}
 
 			if (!dfield_data_is_binary_equal(
 				dfield, vfield->len,
@@ -1939,9 +1954,26 @@ row_upd_eval_new_vals(
 	}
 }
 
+/** Copies the data pointed to by the new values for virtual fields to update
+@param[in,out]	update		an update vector */
+static
+void
+row_upd_dup_v_new_vals(
+	const upd_t*	update)
+{
+	ut_ad(update != NULL);
+
+	for (ulint j = 0; j < upd_get_n_fields(update); j++) {
+		upd_field_t *upd_field = upd_get_nth_field(update, j);
+		if (upd_field->new_val.type.prtype & DATA_VIRTUAL) {
+			dfield_dup(&upd_field->new_val, update->heap);
+		}
+	}
+}
+
 /** Stores to the heap the virtual columns that need for any indexes
 @param[in,out]	node		row update node
-@param[in]	update		an update vector if it is update
+@param[in,out]	update		an update vector if it is update
 @param[in]	thd		mysql thread handle
 @param[in,out]	mysql_table	mysql table object */
 static
@@ -1954,6 +1986,8 @@ row_upd_store_v_row(
 {
 	mem_heap_t*	heap = NULL;
 	dict_index_t*	index = dict_table_get_first_index(node->table);
+	bool		new_val_v_cols_dup = false;
+	const ulint	n_upd = update ? upd_get_n_fields(update) : 0;
 
 	for (ulint col_no = 0; col_no < dict_table_get_n_v_cols(node->table);
 	     col_no++) {
@@ -1964,8 +1998,6 @@ row_upd_store_v_row(
 		if (col->m_col.ord_part) {
 			dfield_t*	dfield
 				= dtuple_get_nth_v_field(node->row, col_no);
-			ulint		n_upd
-				= update ? upd_get_n_fields(update) : 0;
 			ulint		i = 0;
 
 			/* Check if the value is already in update vector */
@@ -1979,6 +2011,7 @@ row_upd_store_v_row(
 				}
 
 				dfield_copy_data(dfield, upd_field->old_v_val);
+				dfield_dup(dfield, node->heap);
 				break;
 			}
 
@@ -1999,6 +2032,19 @@ row_upd_store_v_row(
 								update->old_vrow,
 								col_no);
 						dfield_copy_data(dfield, vfield);
+						dfield_dup(dfield, node->heap);
+						if (dfield_is_null(dfield)) {
+						  if (!new_val_v_cols_dup) {
+						    row_upd_dup_v_new_vals(
+						      update);
+						    new_val_v_cols_dup = true;
+						  }
+						  innobase_get_computed_value(
+							node->row, col, index,
+							&heap, node->heap, NULL,
+							thd, mysql_table, NULL,
+							NULL, NULL);
+						}
 					}
 				} else {
 					/* Need to compute, this happens when
@@ -2572,7 +2618,7 @@ check_fk:
 
 	err = row_ins_clust_index_entry(
 		index, entry, thr,
-		node->upd_ext ? node->upd_ext->n_ext : 0, false);
+		entry->get_n_ext(), false);
 	node->state = UPD_NODE_INSERT_CLUSTERED;
 
 	mem_heap_free(heap);

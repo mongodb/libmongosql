@@ -1,15 +1,21 @@
 /*
-* Copyright (c) 2015, 2016 Oracle and/or its affiliates. All rights reserved.
+* Copyright (c) 2015, 2023, Oracle and/or its affiliates.
 *
-* This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License as
-* published by the Free Software Foundation; version 2 of the
-* License.
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License, version 2.0,
+* as published by the Free Software Foundation.
+*
+* This program is also distributed with certain software (including
+* but not limited to OpenSSL) that is licensed under separate terms,
+* as designated in a particular file or component or in included license
+* documentation.  The authors of MySQL hereby grant you an additional
+* permission to link the program and your derivative works with the
+* separately licensed software that they have included with MySQL.
 *
 * This program is distributed in the hope that it will be useful,
 * but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License, version 2.0, for more details.
 *
 * You should have received a copy of the GNU General Public License
 * along with this program; if not, write to the Free Software
@@ -88,14 +94,14 @@ void Message_builder::start_message(Output_buffer* out_buffer, uint8 type)
   // it is possible that the size which is stored on 4-bytes will be split into 2 pages
   // in that case we need to keep 2 addresses to be able to write the size when it is known
   m_out_stream->GetDirectBufferPointer(reinterpret_cast<void**>(&m_size_addr1), &m_size_addr1_size);
-  DBUG_ASSERT(m_size_addr1_size >= 1);
+  assert(m_size_addr1_size >= 1);
   if (static_cast<size_t>(m_size_addr1_size) < sizeof(google::protobuf::uint32))
   {
     int bytes_left = sizeof(google::protobuf::uint32) - m_size_addr1_size;
     int size_addr2_size;
     m_out_stream->Skip(m_size_addr1_size);
     m_out_stream->GetDirectBufferPointer(reinterpret_cast<void**>(&m_size_addr2), &size_addr2_size);
-    DBUG_ASSERT(size_addr2_size > bytes_left);
+    assert(size_addr2_size > bytes_left);
     m_out_stream->Skip(bytes_left);
   }
   else

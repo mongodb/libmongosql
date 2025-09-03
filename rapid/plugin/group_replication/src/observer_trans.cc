@@ -1,13 +1,20 @@
-/* Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2013, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -258,7 +265,7 @@ int group_replication_trans_before_commit(Trans_param *param)
   DBUG_EXECUTE_IF("group_replication_before_commit_hook_wait",
                   {
                     const char act[]= "now wait_for continue_commit";
-                    DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+                    assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
                   });
 
   /*
@@ -268,9 +275,12 @@ int group_replication_trans_before_commit(Trans_param *param)
     lock below.
   */
   Replication_thread_api channel_interface;
-  if (channel_interface.is_own_event_applier(param->thread_id,
-                                             "group_replication_applier"))
-  {
+  if (GR_APPLIER_CHANNEL == param->rpl_channel_type) {
+    // If plugin is not initialized, there is nothing to do.
+    if (NULL == local_member_info) {
+      DBUG_RETURN(0);
+    }
+
     // If plugin is stopping, there is no point in update the statistics.
     bool fail_to_lock= shared_plugin_stop_lock->try_grab_read_lock();
     if (!fail_to_lock)
@@ -287,13 +297,14 @@ int group_replication_trans_before_commit(Trans_param *param)
 
     DBUG_RETURN(0);
   }
-  if (channel_interface.is_own_event_applier(param->thread_id,
-                                             "group_replication_recovery"))
-  {
+  if (GR_RECOVERY_CHANNEL == param->rpl_channel_type) {
     DBUG_RETURN(0);
   }
 
-  shared_plugin_stop_lock->grab_read_lock();
+  if (shared_plugin_stop_lock->try_grab_read_lock()) {
+    /* If plugin is stopping, rollback the transaction immediatly. */
+    DBUG_RETURN(1);
+  }
 
   if (is_plugin_waiting_to_set_server_read_mode())
   {
@@ -310,7 +321,7 @@ int group_replication_trans_before_commit(Trans_param *param)
     DBUG_RETURN(0);
   }
 
-  DBUG_ASSERT(applier_module != NULL && recovery_module != NULL);
+  assert(applier_module != NULL && recovery_module != NULL);
   Group_member_info::Group_member_status member_status=
       local_member_info->get_recovery_status();
 
@@ -406,7 +417,7 @@ int group_replication_trans_before_commit(Trans_param *param)
   applier_module->get_pipeline_stats_member_collector()
       ->increment_transactions_local();
 
-  DBUG_ASSERT(cache_log->type == WRITE_CACHE);
+  assert(cache_log->type == WRITE_CACHE);
   DBUG_PRINT("cache_log", ("thread_id: %u, trx_cache_log_position: %llu,"
                            " stmt_cache_log_position: %llu",
                            param->thread_id, trx_cache_log_position,
@@ -490,7 +501,7 @@ int group_replication_trans_before_commit(Trans_param *param)
         /* purecov: end */
       }
       cleanup_transaction_write_set(write_set);
-      DBUG_ASSERT(is_gtid_specified || (tcle->get_write_set()->size() > 0));
+      assert(is_gtid_specified || (tcle->get_write_set()->size() > 0));
     }
     else
     {
@@ -559,7 +570,7 @@ int group_replication_trans_before_commit(Trans_param *param)
   }
 
 
-  DBUG_ASSERT(certification_latch != NULL);
+  assert(certification_latch != NULL);
   if (certification_latch->registerTicket(param->thread_id))
   {
     /* purecov: begin inspected */
@@ -571,17 +582,17 @@ int group_replication_trans_before_commit(Trans_param *param)
     /* purecov: end */
   }
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   DBUG_EXECUTE_IF("test_basic_CRUD_operations_sql_service_interface",
                   {
                     DBUG_SET("-d,test_basic_CRUD_operations_sql_service_interface");
-                    DBUG_ASSERT(!sql_command_check());
+                    assert(!sql_command_check());
                   };);
 
   DBUG_EXECUTE_IF("group_replication_before_message_broadcast",
                   {
                     const char act[]= "now wait_for waiting";
-                    DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+                    assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
                   });
 #endif
 
@@ -615,7 +626,7 @@ int group_replication_trans_before_commit(Trans_param *param)
 
   shared_plugin_stop_lock->release_read_lock();
 
-  DBUG_ASSERT(certification_latch != NULL);
+  assert(certification_latch != NULL);
   if (certification_latch->waitTicket(param->thread_id))
   {
     /* purecov: begin inspected */
@@ -647,7 +658,7 @@ err:
     if (error == pre_wait_error)
       shared_plugin_stop_lock->release_read_lock();
 
-    DBUG_ASSERT(certification_latch != NULL);
+    assert(certification_latch != NULL);
     // Release and remove certification latch ticket.
     certification_latch->releaseTicket(param->thread_id);
     certification_latch->waitTicket(param->thread_id);
@@ -656,7 +667,7 @@ err:
   DBUG_EXECUTE_IF("group_replication_after_before_commit_hook",
                  {
                     const char act[]= "now wait_for signal.commit_continue";
-                    DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+                    assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
                  });
   DBUG_RETURN(error);
 }
@@ -815,7 +826,7 @@ bool
 Transaction_Message::append_cache(IO_CACHE *src)
 {
   DBUG_ENTER("append_cache");
-  DBUG_ASSERT(src->type == READ_CACHE);
+  assert(src->type == READ_CACHE);
 
   uchar *buffer= src->read_pos;
   size_t length= my_b_fill(src);
@@ -825,15 +836,23 @@ Transaction_Message::append_cache(IO_CACHE *src)
     length= my_b_bytes_in_cache(src);
   }
 
-  while (length > 0 && !src->error)
+  try
   {
-    data.insert(data.end(),
-                buffer,
-                buffer + length);
+    while (length > 0 && !src->error)
+    {
+      data.insert(data.end(),
+                  buffer,
+                  buffer + length);
 
-    src->read_pos= src->read_end;
-    length= my_b_fill(src);
-    buffer= src->read_pos;
+      src->read_pos= src->read_end;
+      length= my_b_fill(src);
+      buffer= src->read_pos;
+    }
+  }
+  catch (const std::bad_alloc &)
+  {
+    log_message(MY_ERROR_LEVEL, ER_DEFAULT(ER_OUT_OF_RESOURCES));
+    DBUG_RETURN(true);
   }
 
   DBUG_RETURN(src->error ? true : false);

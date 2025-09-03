@@ -1,13 +1,20 @@
-/* Copyright (c) 2014, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -285,7 +292,9 @@ Applier_module::apply_view_change_packet(View_change_packet *view_change_packet,
   Pipeline_event* pevent= new Pipeline_event(view_change_event, fde_evt, cache);
   pevent->mark_event(SINGLE_VIEW_EVENT);
   error= inject_event_into_pipeline(pevent, cont);
-  delete pevent;
+  //When discarded, the VCLE logging was delayed, so don't delete it
+  if (!cont->is_transaction_discarded())
+    delete pevent;
 
   return error;
 }
@@ -301,7 +310,7 @@ int Applier_module::apply_data_packet(Data_packet *data_packet,
 
   DBUG_EXECUTE_IF("group_replication_before_apply_data_packet", {
     const char act[] = "now wait_for continue_apply";
-    DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+    assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
   });
 
   if (check_single_primary_queue_status())
@@ -346,7 +355,7 @@ Applier_module::apply_single_primary_action_packet(Single_primary_action_packet 
       certifier->disable_conflict_detection();
       break;
     default:
-      DBUG_ASSERT(0); /* purecov: inspected */
+      assert(0); /* purecov: inspected */
   }
 
   return error;
@@ -450,7 +459,7 @@ Applier_module::applier_thread_handle()
           this->incoming->pop();
           break;
       default:
-        DBUG_ASSERT(0); /* purecov: inspected */
+        assert(0); /* purecov: inspected */
     }
 
     delete packet;
@@ -483,7 +492,7 @@ end:
   DBUG_EXECUTE_IF("applier_thd_timeout",
                   {
                     const char act[]= "now wait_for signal.applier_continue";
-                    DBUG_ASSERT(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
+                    assert(!debug_sync_set_action(current_thd, STRING_WITH_LEN(act)));
                   });
 
   if (cache != NULL)
@@ -606,7 +615,7 @@ Applier_module::terminate_applier_thread()
     */
     struct timespec abstime;
     set_timespec(&abstime, 2);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     int error=
 #endif
       mysql_cond_timedwait(&run_cond, &run_lock, &abstime);
@@ -619,10 +628,10 @@ Applier_module::terminate_applier_thread()
       mysql_mutex_unlock(&run_lock);
       DBUG_RETURN(1);
     }
-    DBUG_ASSERT(error == ETIMEDOUT || error == 0);
+    assert(error == ETIMEDOUT || error == 0);
   }
 
-  DBUG_ASSERT(!applier_running);
+  assert(!applier_running);
 
 delete_pipeline:
 
@@ -683,6 +692,11 @@ void Applier_module::leave_group_on_failure()
                                          Group_member_info::MEMBER_ERROR);
 
   bool set_read_mode= false;
+  if (view_change_notifier != NULL &&
+      !view_change_notifier->is_view_modification_ongoing())
+  {
+    view_change_notifier->start_view_modification();
+  }
   Gcs_operations::enum_leave_state state= gcs_module->leave();
 
   int error= channel_stop_all(CHANNEL_APPLIER_THREAD|CHANNEL_RECEIVER_THREAD,
@@ -743,6 +757,30 @@ void Applier_module::kill_pending_transactions(bool set_read_mode,
       enable_server_read_mode(PSESSION_INIT_THREAD);
     else
       enable_server_read_mode(PSESSION_USE_THREAD);
+  }
+
+  if (view_change_notifier != NULL)
+  {
+    log_message(MY_INFORMATION_LEVEL, "Going to wait for view modification");
+    if (view_change_notifier->wait_for_view_modification())
+    {
+      log_message(MY_ERROR_LEVEL, "On shutdown there was a timeout receiving a "
+                                  "view change. This can lead to a possible "
+                                  "inconsistent state. Check the log for more "
+                                  "details");
+    }
+  }
+
+  /*
+    Only abort() if we successfully asked to leave() the group (and we have
+    group_replication_exit_state_action set to ABORT_SERVER).
+    We don't want to abort() during the execution of START GROUP_REPLICATION or
+    STOP GROUP_REPLICATION.
+  */
+  if (set_read_mode &&
+      exit_state_action_var == EXIT_STATE_ACTION_ABORT_SERVER)
+  {
+    abort_plugin_process("Fatal error during execution of Group Replication");
   }
 
   DBUG_VOID_RETURN;
@@ -913,7 +951,7 @@ Applier_module::intersect_group_executed_sets(std::vector<std::string>& gtid_set
     }
   }
 
-#if !defined(DBUG_OFF)
+#if !defined(NDEBUG)
   char *executed_set_string;
   output_set->to_string(&executed_set_string);
   DBUG_PRINT("info", ("View change GTID information: output_set: %s",
@@ -950,4 +988,44 @@ int Applier_module::check_single_primary_queue_status()
   }
 
   return 0;
+}
+
+Pipeline_member_stats *Applier_module::get_local_pipeline_stats()
+{
+  // We need run_lock to get protection against STOP GR command.
+
+  Mutex_autolock auto_lock_mutex(&run_lock);
+  Pipeline_member_stats *stats= NULL;
+  Certification_handler *cert= this->get_certification_handler();
+  Certifier_interface *cert_module= (cert ? cert->get_certifier() : NULL);
+  if (cert_module)
+  {
+    stats= new Pipeline_member_stats(
+        get_pipeline_stats_member_collector(), get_message_queue_size(),
+        cert_module->get_negative_certified(),
+        cert_module->get_certification_info_size());
+    {
+      char *committed_transactions_buf= NULL;
+      size_t committed_transactions_buf_length= 0;
+      int outcome= cert_module->get_group_stable_transactions_set_string(
+          &committed_transactions_buf, &committed_transactions_buf_length);
+
+      if (!outcome && committed_transactions_buf_length > 0)
+        stats->set_transaction_committed_all_members(committed_transactions_buf,
+                committed_transactions_buf_length);
+      my_free(committed_transactions_buf);
+    }
+    {
+      std::string last_conflict_free_transaction;
+      cert_module->get_last_conflict_free_transaction(
+          &last_conflict_free_transaction);
+      stats->set_transaction_last_conflict_free(last_conflict_free_transaction);
+    }
+  }
+  else
+  {
+    stats= new Pipeline_member_stats(get_pipeline_stats_member_collector(),
+                                     get_message_queue_size(), 0, 0);
+  }
+  return stats;
 }

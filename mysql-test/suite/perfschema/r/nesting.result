@@ -177,15 +177,13 @@ relative_event_id	relative_end_event_id	event_name	comment	nesting_event_type	re
 54	55	stage/sql/cleaning up	(stage)	STATEMENT	38
 55	55	wait/synch/mutex/sql/THD::LOCK_thd_query	lock	STAGE	54
 56	56	idle	idle	NULL	NULL
-57	73	statement/sql/select	select "This is the first part of a multi query" as payload;
-select "And this is the second part of a multi query" as payload;
-select "With a third part to make things complete" as payload	NULL	NULL
+57	73	statement/sql/select	select "This is the first part of a multi query" as payload	NULL	NULL
 58	63	stage/sql/starting	(stage)	STATEMENT	57
 59	59	wait/io/socket/sql/client_connection	recv	STAGE	58
 60	60	wait/synch/mutex/sql/THD::LOCK_thd_data	lock	STAGE	58
 61	61	wait/synch/mutex/sql/THD::LOCK_thd_query	lock	STAGE	58
-62	62	wait/io/file/sql/query_log	write	STAGE	58
-63	63	wait/synch/mutex/sql/THD::LOCK_thd_query	lock	STAGE	58
+62	62	wait/synch/mutex/sql/THD::LOCK_thd_query	lock	STAGE	58
+63	63	wait/io/file/sql/query_log	write	STAGE	58
 64	64	stage/sql/checking permissions	(stage)	STATEMENT	57
 65	65	stage/sql/Opening tables	(stage)	STATEMENT	57
 66	66	stage/sql/init	(stage)	STATEMENT	57
@@ -196,13 +194,12 @@ select "With a third part to make things complete" as payload	NULL	NULL
 71	71	stage/sql/closing tables	(stage)	STATEMENT	57
 72	73	stage/sql/freeing items	(stage)	STATEMENT	57
 73	73	wait/io/socket/sql/client_connection	send	STAGE	72
-74	89	statement/sql/select	select "And this is the second part of a multi query" as payload;
-select "With a third part to make things complete" as payload	NULL	NULL
+74	89	statement/sql/select	select "And this is the second part of a multi query" as payload	NULL	NULL
 75	79	stage/sql/starting	(stage)	STATEMENT	74
 76	76	wait/synch/mutex/sql/THD::LOCK_thd_query	lock	STAGE	75
 77	77	wait/synch/mutex/sql/THD::LOCK_thd_data	lock	STAGE	75
-78	78	wait/io/file/sql/query_log	write	STAGE	75
-79	79	wait/synch/mutex/sql/THD::LOCK_thd_query	lock	STAGE	75
+78	78	wait/synch/mutex/sql/THD::LOCK_thd_query	lock	STAGE	75
+79	79	wait/io/file/sql/query_log	write	STAGE	75
 80	80	stage/sql/checking permissions	(stage)	STATEMENT	74
 81	81	stage/sql/Opening tables	(stage)	STATEMENT	74
 82	82	stage/sql/init	(stage)	STATEMENT	74

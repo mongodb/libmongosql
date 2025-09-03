@@ -1,13 +1,20 @@
-/* Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2016, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -25,18 +32,12 @@ const std::string Gcs_operations::gcs_engine= "xcom";
 
 Gcs_operations::Gcs_operations()
   : gcs_interface(NULL),
-    leave_coordination_leaving(false),
-    leave_coordination_left(false),
-    finalize_ongoing(false)
+    leave_coordination_leaving(0),
+    leave_coordination_left(0)
 {
   gcs_operations_lock= new Checkable_rwlock(
 #ifdef HAVE_PSI_INTERFACE
       key_GR_RWLOCK_gcs_operations
-#endif
-  );
-  finalize_ongoing_lock= new Checkable_rwlock(
-#ifdef HAVE_PSI_INTERFACE
-      key_GR_RWLOCK_gcs_operations_finalize_ongoing
 #endif
   );
 }
@@ -45,7 +46,6 @@ Gcs_operations::Gcs_operations()
 Gcs_operations::~Gcs_operations()
 {
   delete gcs_operations_lock;
-  delete finalize_ongoing_lock;
 }
 
 
@@ -56,10 +56,10 @@ Gcs_operations::initialize()
   int error= 0;
   gcs_operations_lock->wrlock();
 
-  leave_coordination_leaving= false;
-  leave_coordination_left= false;
+  my_atomic_store32(&leave_coordination_leaving, 0);
+  my_atomic_store32(&leave_coordination_left, 0);
 
-  DBUG_ASSERT(gcs_interface == NULL);
+  assert(gcs_interface == NULL);
   if ((gcs_interface=
            Gcs_interface_factory::get_interface_implementation(
                gcs_engine)) == NULL)
@@ -93,20 +93,14 @@ void
 Gcs_operations::finalize()
 {
   DBUG_ENTER("Gcs_operations::finalize");
-  finalize_ongoing_lock->wrlock();
-  finalize_ongoing= true;
   gcs_operations_lock->wrlock();
-  finalize_ongoing_lock->unlock();
 
   if (gcs_interface != NULL)
     gcs_interface->finalize();
   Gcs_interface_factory::cleanup(gcs_engine);
   gcs_interface= NULL;
 
-  finalize_ongoing_lock->wrlock();
-  finalize_ongoing= false;
   gcs_operations_lock->unlock();
-  finalize_ongoing_lock->unlock();
   DBUG_VOID_RETURN;
 }
 
@@ -206,12 +200,12 @@ Gcs_operations::leave()
   enum_leave_state state= ERROR_WHEN_LEAVING;
   gcs_operations_lock->wrlock();
 
-  if (leave_coordination_left)
+  if (my_atomic_load32(&leave_coordination_left))
   {
     state= ALREADY_LEFT;
     goto end;
   }
-  if (leave_coordination_leaving)
+  if (my_atomic_load32(&leave_coordination_leaving))
   {
     state= ALREADY_LEAVING;
     goto end;
@@ -229,7 +223,7 @@ Gcs_operations::leave()
       if (!gcs_control->leave())
       {
         state= NOW_LEAVING;
-        leave_coordination_leaving= true;
+        my_atomic_store32(&leave_coordination_leaving, 1);
         goto end;
       }
     }
@@ -261,30 +255,8 @@ void
 Gcs_operations::leave_coordination_member_left()
 {
   DBUG_ENTER("Gcs_operations::leave_coordination_member_left");
-
-  /*
-    If finalize method is ongoing, it means that GCS is waiting that
-    all messages and views are delivered to GR, if we proceed with
-    this method we will enter on the deadlock:
-      1) leave view was not delivered before wait view timeout;
-      2) finalize did start and acquired lock->wrlock();
-      3) leave view was delivered, member_left is waiting to
-         acquire lock->wrlock().
-    So, if leaving, we just do nothing.
-  */
-  finalize_ongoing_lock->rdlock();
-  if (finalize_ongoing)
-  {
-    finalize_ongoing_lock->unlock();
-    DBUG_VOID_RETURN;
-  }
-  gcs_operations_lock->wrlock();
-  finalize_ongoing_lock->unlock();
-
-  leave_coordination_leaving= false;
-  leave_coordination_left= true;
-
-  gcs_operations_lock->unlock();
+  my_atomic_store32(&leave_coordination_leaving, 0);
+  my_atomic_store32(&leave_coordination_left, 1);
   DBUG_VOID_RETURN;
 }
 

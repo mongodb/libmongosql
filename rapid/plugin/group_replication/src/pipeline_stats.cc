@@ -1,18 +1,26 @@
-/* Copyright (c) 2016, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2016, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
    51 Franklin Street, Suite 500, Boston, MA 02110-1335 USA */
 
+#include <mysql/group_replication_priv.h>
 #include "pipeline_stats.h"
 #include "plugin_server_include.h"
 #include "plugin_log.h"
@@ -225,7 +233,7 @@ void
 Pipeline_stats_member_collector::increment_transactions_waiting_apply()
 {
   mysql_mutex_lock(&m_transactions_waiting_apply_lock);
-  DBUG_ASSERT(my_atomic_load32(&m_transactions_waiting_apply) >= 0);
+  assert(my_atomic_load32(&m_transactions_waiting_apply) >= 0);
   my_atomic_add32(&m_transactions_waiting_apply, 1);
   mysql_mutex_unlock(&m_transactions_waiting_apply_lock);
 }
@@ -237,7 +245,7 @@ Pipeline_stats_member_collector::decrement_transactions_waiting_apply()
   mysql_mutex_lock(&m_transactions_waiting_apply_lock);
   if (m_transactions_waiting_apply > 0)
     my_atomic_add32(&m_transactions_waiting_apply, -1);
-  DBUG_ASSERT(my_atomic_load32(&m_transactions_waiting_apply) >= 0);
+  assert(my_atomic_load32(&m_transactions_waiting_apply) >= 0);
   mysql_mutex_unlock(&m_transactions_waiting_apply_lock);
 }
 
@@ -262,6 +270,25 @@ Pipeline_stats_member_collector::increment_transactions_local()
   my_atomic_add64(&m_transactions_local, 1);
 }
 
+int32 Pipeline_stats_member_collector::get_transactions_waiting_apply()
+{
+  return my_atomic_load32(&m_transactions_waiting_apply);
+}
+
+int64 Pipeline_stats_member_collector::get_transactions_certified()
+{
+  return my_atomic_load64(&m_transactions_certified);
+}
+
+int64 Pipeline_stats_member_collector::get_transactions_applied()
+{
+  return my_atomic_load64(&m_transactions_applied);
+}
+
+int64 Pipeline_stats_member_collector::get_transactions_local()
+{
+  return my_atomic_load64(&m_transactions_local);
+}
 
 void
 Pipeline_stats_member_collector::send_stats_member_message()
@@ -299,6 +326,10 @@ Pipeline_member_stats::Pipeline_member_stats()
     m_delta_transactions_applied(0),
     m_transactions_local(0),
     m_delta_transactions_local(0),
+    m_transactions_negative_certified(0),
+    m_transactions_rows_validating(0),
+    m_transactions_committed_all_members(),
+    m_transaction_last_conflict_free(),
     m_stamp(0)
 {}
 
@@ -312,9 +343,31 @@ Pipeline_member_stats::Pipeline_member_stats(Pipeline_stats_member_message &msg)
     m_delta_transactions_applied(0),
     m_transactions_local(msg.get_transactions_local()),
     m_delta_transactions_local(0),
+    m_transactions_negative_certified(0),
+    m_transactions_rows_validating(0),
+    m_transactions_committed_all_members(),
+    m_transaction_last_conflict_free(),
     m_stamp(0)
 {}
 
+Pipeline_member_stats::Pipeline_member_stats(
+    Pipeline_stats_member_collector *pipeline_stats, ulonglong applier_queue,
+    ulonglong negative_certified, ulonglong certification_size)
+  : m_transactions_committed_all_members(),
+    m_transaction_last_conflict_free()
+{
+  m_transactions_waiting_certification= applier_queue;
+  m_transactions_waiting_apply= pipeline_stats->get_transactions_waiting_apply();
+  m_transactions_certified= pipeline_stats->get_transactions_certified();
+  m_delta_transactions_certified= 0;
+  m_transactions_applied= pipeline_stats->get_transactions_applied();
+  m_delta_transactions_applied= 0;
+  m_transactions_local= pipeline_stats->get_transactions_local();
+  m_delta_transactions_local= 0;
+  m_transactions_negative_certified= negative_certified;
+  m_transactions_rows_validating= certification_size;
+  m_stamp= 0;
+}
 
 Pipeline_member_stats::~Pipeline_member_stats()
 {}
@@ -391,6 +444,42 @@ Pipeline_member_stats::get_delta_transactions_local()
   return m_delta_transactions_local;
 }
 
+int64 Pipeline_member_stats::get_transactions_negative_certified()
+{
+  return m_transactions_negative_certified;
+}
+
+int64 Pipeline_member_stats::get_transactions_rows_validating()
+{
+  return m_transactions_rows_validating;
+}
+
+void Pipeline_member_stats::get_transaction_committed_all_members(std::string &value)
+{
+  value.assign(m_transactions_committed_all_members);
+}
+
+void Pipeline_member_stats::set_transaction_committed_all_members(char *str, size_t len)
+{
+  m_transactions_committed_all_members.assign(str, len);
+}
+
+void Pipeline_member_stats::get_transaction_last_conflict_free(
+    std::string &value)
+{
+  value.assign(m_transaction_last_conflict_free);
+}
+
+void Pipeline_member_stats::set_transaction_last_conflict_free(
+    std::string &value)
+{
+  m_transaction_last_conflict_free.assign(value);
+}
+
+int64 Pipeline_member_stats::get_transactions_certified()
+{
+  return m_transactions_certified;
+}
 
 uint64
 Pipeline_member_stats::get_stamp()
@@ -399,7 +488,7 @@ Pipeline_member_stats::get_stamp()
 }
 
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 void
 Pipeline_member_stats::debug(const char *member, int64 quota_size,
                              int64 quota_used)
@@ -537,7 +626,7 @@ Flow_control_module::flow_control_step()
       break;
 
     default:
-      DBUG_ASSERT(0);
+      assert(0);
   }
 }
 
@@ -574,7 +663,7 @@ Flow_control_module::handle_stats_data(const uchar *data,
   if (it->second.is_flow_control_needed())
   {
     my_atomic_add32(&m_holds_in_period, 1);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     it->second.debug(it->first.c_str(),
                      my_atomic_load64(&m_quota_size),
                      my_atomic_load64(&m_quota_used));

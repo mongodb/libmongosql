@@ -1,13 +1,20 @@
-/* Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2013, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -25,6 +32,7 @@
 #include "sql_parse.h"               // add_join_natural
 #include "sql_update.h"              // Sql_cmd_update
 #include "sql_admin.h"               // Sql_cmd_shutdown etc.
+#include "sql_cmd_show.h"            // Sql_cmd_show_processlist
 
 
 template<enum_parsing_context Context> class PTI_context;
@@ -87,11 +95,15 @@ public:
     lex->pop_context();
     pc->select->n_child_sum_items += child->n_sum_items;
     /*
-      A subselect can add fields to an outer select. Reserve space for
-      them.
+      A subquery (and all the subsequent query blocks in a UNION) can add
+      columns to an outer query block. Reserve space for them.
     */
-    pc->select->select_n_where_fields+= child->select_n_where_fields;
-    pc->select->select_n_having_items+= child->select_n_having_items;
+    for (SELECT_LEX *temp = child; temp != NULL;
+         temp = temp->next_select())
+    {
+      pc->select->select_n_where_fields+= temp->select_n_where_fields;
+      pc->select->select_n_having_items+= temp->select_n_having_items;
+    }
     value= query_expression_body->value;
     return false;
   }
@@ -204,7 +216,7 @@ public:
     if (pc->select->master_unit()->is_union() && !pc->select->braces)
     {
       pc->select= pc->select->master_unit()->fake_select_lex;
-      DBUG_ASSERT(pc->select != NULL);
+      assert(pc->select != NULL);
     }
 
     if (limit_options.is_offset_first && limit_options.opt_offset != NULL &&
@@ -309,11 +321,11 @@ public:
   : tab1_node(tab1_node_arg), join_pos(join_pos_arg), tab2_node(tab2_node_arg),
     tr1(NULL), tr2(NULL)
   {
-    DBUG_ASSERT(dbug_exclusive_flags(JTT_NORMAL | JTT_STRAIGHT | JTT_NATURAL));
-    DBUG_ASSERT(dbug_exclusive_flags(JTT_LEFT | JTT_RIGHT));
+    assert(dbug_exclusive_flags(JTT_NORMAL | JTT_STRAIGHT | JTT_NATURAL));
+    assert(dbug_exclusive_flags(JTT_LEFT | JTT_RIGHT));
   }
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   bool dbug_exclusive_flags(unsigned int mask)
   {
 #ifdef __GNUC__
@@ -337,7 +349,7 @@ public:
       {
         TABLE_LIST *inner_table= pc->select->convert_right_join();
         /* swap tr1 and tr2 */
-        DBUG_ASSERT(inner_table == tr1);
+        assert(inner_table == tr1);
         tr1= tr2;
         tr2= inner_table;
       }
@@ -403,11 +415,11 @@ public:
 
     if (super::contextualize(pc) || on->itemize(pc, &on))
       return true;
-    DBUG_ASSERT(sel == pc->select);
+    assert(sel == pc->select);
 
     add_join_on(this->tr2, on);
     pc->thd->lex->pop_context();
-    DBUG_ASSERT(sel->parsing_place == CTX_ON);
+    assert(sel->parsing_place == CTX_ON);
     sel->parsing_place= CTX_NONE;
     return false;
   }
@@ -498,10 +510,10 @@ public:
 
     if (select_item_list->contextualize(pc))
       return true;
-    DBUG_ASSERT(select == pc->select);
+    assert(select == pc->select);
 
     // Ensure we're resetting parsing place of the right select
-    DBUG_ASSERT(select->parsing_place == CTX_SELECT_LIST);
+    assert(select->parsing_place == CTX_SELECT_LIST);
     select->parsing_place= CTX_NONE;
     return false;
   }
@@ -614,7 +626,7 @@ public:
     if (super::contextualize(pc))
       return true;
 
-    DBUG_ASSERT(pc->select->linkage != GLOBAL_OPTIONS_TYPE);
+    assert(pc->select->linkage != GLOBAL_OPTIONS_TYPE);
     SELECT_LEX *fake= pc->select->master_unit()->fake_select_lex;
     if (fake)
     {
@@ -1180,7 +1192,9 @@ class PT_internal_variable_name_2d : public PT_internal_variable_name
 {
   typedef PT_internal_variable_name super;
 
-  POS pos;
+public:
+  const POS pos;
+private:
   LEX_STRING ident1;
   LEX_STRING ident2;
 
@@ -1349,6 +1363,11 @@ public:
 
     THD *thd= pc->thd;
     struct sys_var_with_base tmp= name->value;
+    if (tmp.var == trg_new_row_fake_var)
+    {
+      error(pc, down_cast<PT_internal_variable_name_2d *>(name)->pos);
+      return true;
+    }
     /* Lookup if necessary: must be a system variable. */
     if (tmp.var == NULL)
     {
@@ -1529,14 +1548,14 @@ public:
     if (!user->user.str)
     {
       LEX_CSTRING sctx_priv_user= thd->security_context()->priv_user();
-      DBUG_ASSERT(sctx_priv_user.str);
+      assert(sctx_priv_user.str);
       user->user.str= sctx_priv_user.str;
       user->user.length= sctx_priv_user.length;
     }
     if (!user->host.str)
     {
       LEX_CSTRING sctx_priv_host= thd->security_context()->priv_host();
-      DBUG_ASSERT(sctx_priv_host.str);
+      assert(sctx_priv_host.str);
       user->host.str= (char *) sctx_priv_host.str;
       user->host.length= sctx_priv_host.length;
     }
@@ -1598,12 +1617,12 @@ public:
       return true;
 
     THD *thd= pc->thd;
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     LEX *old_lex= thd->lex;
-#endif//DBUG_OFF
+#endif//NDEBUG
 
     sp_create_assignment_lex(thd, delimiter_pos.raw.end);
-    DBUG_ASSERT(thd->lex->select_lex == thd->lex->current_select());
+    assert(thd->lex->select_lex == thd->lex->current_select());
     Parse_context inner_pc(pc->thd, thd->lex->select_lex);
 
     if (value->contextualize(&inner_pc))
@@ -1611,8 +1630,8 @@ public:
 
     if (sp_create_assignment_instr(pc->thd, value_pos.raw.end))
       return true;
-    DBUG_ASSERT(thd->lex == old_lex &&
-                thd->lex->current_select() == pc->select);
+    assert(thd->lex == old_lex &&
+           thd->lex->current_select() == pc->select);
 
     return false;
   }
@@ -1634,6 +1653,8 @@ public:
 
   virtual bool contextualize(Parse_context *pc)
   {
+    uchar dummy;
+    if (check_stack_overrun(pc->thd, STACK_MIN_SIZE, &dummy)) return true;
     return head->contextualize(pc) || super::contextualize(pc);
   }
 };
@@ -1661,7 +1682,7 @@ public:
 
     if (sp_create_assignment_instr(pc->thd, head_pos.raw.end))
       return true;
-    DBUG_ASSERT(pc->thd->lex->select_lex == pc->thd->lex->current_select());
+    assert(pc->thd->lex->select_lex == pc->thd->lex->current_select());
     pc->select= pc->thd->lex->select_lex;
 
     if (tail != NULL && tail->contextualize(pc))
@@ -1777,7 +1798,7 @@ public:
 
     if (sp_create_assignment_instr(thd, end_pos.raw.end))
       return true;
-    DBUG_ASSERT(pc->thd->lex->select_lex == pc->thd->lex->current_select());
+    assert(pc->thd->lex->select_lex == pc->thd->lex->current_select());
     pc->select= pc->thd->lex->select_lex;
 
     return false;
@@ -1814,7 +1835,7 @@ public:
 
     if (sp_create_assignment_instr(pc->thd, head_pos.raw.end))
       return true; 
-    DBUG_ASSERT(pc->thd->lex->select_lex == pc->thd->lex->current_select());
+    assert(pc->thd->lex->select_lex == pc->thd->lex->current_select());
     pc->select= pc->thd->lex->select_lex;
 
     if (opt_tail != NULL && opt_tail->contextualize(pc))
@@ -1848,7 +1869,7 @@ public:
 
     if (sp_create_assignment_instr(pc->thd, characteristics_pos.raw.end))
       return true; 
-    DBUG_ASSERT(pc->thd->lex->select_lex == pc->thd->lex->current_select());
+    assert(pc->thd->lex->select_lex == pc->thd->lex->current_select());
     pc->select= pc->thd->lex->select_lex;
 
     return false;
@@ -1903,7 +1924,7 @@ public:
     lex->autocommit= false;
 
     sp_create_assignment_lex(thd, set_pos.raw.end);
-    DBUG_ASSERT(pc->thd->lex->select_lex == pc->thd->lex->current_select());
+    assert(pc->thd->lex->select_lex == pc->thd->lex->current_select());
     pc->select= pc->thd->lex->select_lex;
 
     return list->contextualize(pc);
@@ -2044,7 +2065,7 @@ public:
   explicit PT_select_var(const LEX_STRING &name_arg) : name(name_arg) {}
 
   virtual bool is_local() const { return false; }
-  virtual uint get_offset() const { DBUG_ASSERT(0); return 0; }
+  virtual uint get_offset() const { assert(0); return 0; }
 };
 
 
@@ -2054,7 +2075,7 @@ class PT_select_sp_var : public PT_select_var
 
   uint offset;
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   /*
     Routine to which this Item_splocal belongs. Used for checking if correct
     runtime context is used for variable handling.
@@ -2074,7 +2095,7 @@ public:
       return true;
 
     LEX *lex= pc->thd->lex;
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     sp= lex->sphead;
 #endif
     sp_pcontext *pctx= lex->get_sp_current_parsing_ctx();
@@ -2165,7 +2186,7 @@ public:
       return true;
 
     // Ensure we're resetting parsing place of the right select
-    DBUG_ASSERT(pc->select->parsing_place == CTX_SELECT_LIST);
+    assert(pc->select->parsing_place == CTX_SELECT_LIST);
     pc->select->parsing_place= CTX_NONE;
     return false;
   }
@@ -2257,9 +2278,9 @@ public:
          opt_into2->contextualize(pc)))
       return true;
 
-    DBUG_ASSERT(opt_into1 == NULL || opt_into2 == NULL);
-    DBUG_ASSERT(opt_procedure_analyse_clause == NULL ||
-                (opt_into1 == NULL && opt_into2 == NULL));
+    assert(opt_into1 == NULL || opt_into2 == NULL);
+    assert(opt_procedure_analyse_clause == NULL ||
+           (opt_into1 == NULL && opt_into2 == NULL));
 
     /*
       @todo: explain should not affect how we construct the query data
@@ -2460,7 +2481,7 @@ public:
 
   bool is_multitable() const
   {
-    DBUG_ASSERT((table_ident != NULL) ^ (table_list.size() > 0));
+    assert((table_ident != NULL) ^ (table_list.size() > 0));
     return table_ident == NULL;
   }
 
@@ -2549,7 +2570,7 @@ public:
 
   virtual List<List_item> &get_many_values()
   {
-    DBUG_ASSERT(is_contextualized());
+    assert(is_contextualized());
     return many_values;
   }
 };
@@ -2617,16 +2638,16 @@ public:
     opt_on_duplicate_value_list(opt_on_duplicate_value_list_arg)
   {
     // REPLACE statement can't have IGNORE flag:
-    DBUG_ASSERT(!is_replace || !ignore);
+    assert(!is_replace || !ignore);
     // REPLACE statement can't have ON DUPLICATE KEY UPDATE clause:
-    DBUG_ASSERT(!is_replace || opt_on_duplicate_column_list == NULL);
+    assert(!is_replace || opt_on_duplicate_column_list == NULL);
     // INSERT/REPLACE ... SELECT can't have VALUES clause:
-    DBUG_ASSERT((row_value_list != NULL) ^ (insert_query_expression != NULL));
+    assert((row_value_list != NULL) ^ (insert_query_expression != NULL));
     // ON DUPLICATE KEY UPDATE: column and value arrays must have same sizes:
-    DBUG_ASSERT((opt_on_duplicate_column_list == NULL &&
-                 opt_on_duplicate_value_list == NULL) ||
-                (opt_on_duplicate_column_list->elements() ==
-                 opt_on_duplicate_value_list->elements()));
+    assert((opt_on_duplicate_column_list == NULL &&
+            opt_on_duplicate_value_list == NULL) ||
+           (opt_on_duplicate_column_list->elements() ==
+            opt_on_duplicate_value_list->elements()));
   }
 
   virtual bool contextualize(Parse_context *pc);
@@ -2660,6 +2681,32 @@ public:
 
   virtual Sql_cmd *make_cmd(THD *thd);
   virtual bool contextualize(Parse_context *pc);
+};
+
+/// Base class for Parse tree nodes of SHOW statements
+
+class PT_show_base : public PT_statement {
+ protected:
+  PT_show_base(const POS &pos, enum_sql_command sql_command)
+      : m_pos(pos), m_sql_command(sql_command) {}
+
+  /// Textual location of a token just parsed.
+  POS m_pos;
+  /// SQL command
+  enum_sql_command m_sql_command;
+};
+
+/// Parse tree node for SHOW PROCESSLIST statement
+
+class PT_show_processlist : public PT_show_base {
+ public:
+  PT_show_processlist(const POS &pos, bool verbose)
+      : PT_show_base(pos, SQLCOM_SHOW_PROCESSLIST), m_sql_cmd(verbose) {}
+
+  virtual Sql_cmd *make_cmd(THD *thd);
+
+ private:
+  Sql_cmd_show_processlist m_sql_cmd;
 };
 
 #endif /* PARSE_TREE_NODES_INCLUDED */

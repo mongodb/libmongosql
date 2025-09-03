@@ -1,14 +1,21 @@
 /*
-      Copyright (c) 2013, 2015, Oracle and/or its affiliates. All rights reserved.
+      Copyright (c) 2013, 2023, Oracle and/or its affiliates.
 
       This program is free software; you can redistribute it and/or modify
-      it under the terms of the GNU General Public License as published by
-      the Free Software Foundation; version 2 of the License.
+      it under the terms of the GNU General Public License, version 2.0,
+      as published by the Free Software Foundation.
+
+      This program is also distributed with certain software (including
+      but not limited to OpenSSL) that is licensed under separate terms,
+      as designated in a particular file or component or in included license
+      documentation.  The authors of MySQL hereby grant you an additional
+      permission to link the program and your derivative works with the
+      separately licensed software that they have included with MySQL.
 
       This program is distributed in the hope that it will be useful,
       but WITHOUT ANY WARRANTY; without even the implied warranty of
       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-      GNU General Public License for more details.
+      GNU General Public License, version 2.0, for more details.
 
       You should have received a copy of the GNU General Public License
       along with this program; if not, write to the Free Software
@@ -76,6 +83,11 @@ TABLE_FIELD_DEF
 table_replication_applier_status_by_coordinator::m_field_def=
 { 6, field_types };
 
+PFS_engine_table_share_state
+table_replication_applier_status_by_coordinator::m_share_state = {
+  false /* m_checked */
+};
+
 PFS_engine_table_share
 table_replication_applier_status_by_coordinator::m_share=
 {
@@ -85,11 +97,12 @@ table_replication_applier_status_by_coordinator::m_share=
   NULL, /* write_row */
   NULL, /* delete_all_rows */
   table_replication_applier_status_by_coordinator::get_row_count,
-  sizeof(PFS_simple_index), /* ref length */
+  sizeof(pos_t), /* ref length */
   &m_table_lock,
   &m_field_def,
-  false, /* checked */
-  false  /* perpetual */
+  false, /* m_perpetual */
+  false, /* m_optional */
+  &m_share_state
 };
 
 PFS_engine_table* table_replication_applier_status_by_coordinator::create(void)
@@ -122,12 +135,10 @@ ha_rows table_replication_applier_status_by_coordinator::get_row_count()
 int table_replication_applier_status_by_coordinator::rnd_next(void)
 {
   Master_info *mi;
-  int res= HA_ERR_END_OF_FILE;
-
   channel_map.rdlock();
 
   for(m_pos.set_at(&m_next_pos);
-      m_pos.m_index < channel_map.get_max_channels() && res != 0;
+      m_pos.m_index < channel_map.get_max_channels();
       m_pos.next())
   {
     mi= channel_map.get_mi_at_pos(m_pos.m_index);
@@ -144,12 +155,13 @@ int table_replication_applier_status_by_coordinator::rnd_next(void)
     {
       make_row(mi);
       m_next_pos.set_after(&m_pos);
-      res= 0;
+      channel_map.unlock();
+      return 0;
     }
   }
 
   channel_map.unlock();
-  return res;
+  return HA_ERR_END_OF_FILE;
 }
 
 int table_replication_applier_status_by_coordinator::rnd_pos(const void *pos)
@@ -175,8 +187,8 @@ void table_replication_applier_status_by_coordinator::make_row(Master_info *mi)
 {
   m_row_exists= false;
 
-  DBUG_ASSERT(mi != NULL);
-  DBUG_ASSERT(mi->rli != NULL);
+  assert(mi != NULL);
+  assert(mi->rli != NULL);
 
   mysql_mutex_lock(&mi->rli->data_lock);
 
@@ -236,7 +248,7 @@ int table_replication_applier_status_by_coordinator
   if (unlikely(! m_row_exists))
     return HA_ERR_RECORD_DELETED;
 
-  DBUG_ASSERT(table->s->null_bytes == 1);
+  assert(table->s->null_bytes == 1);
   buf[0]= 0;
 
   for (; (f= *fields) ; fields++)
@@ -268,7 +280,7 @@ int table_replication_applier_status_by_coordinator
         set_field_timestamp(f, m_row.last_error_timestamp);
         break;
       default:
-        DBUG_ASSERT(false);
+        assert(false);
       }
     }
   }

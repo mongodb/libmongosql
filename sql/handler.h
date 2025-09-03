@@ -2,17 +2,23 @@
 #define HANDLER_INCLUDED
 
 /*
-   Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   as published by the Free Software Foundation; version 2 of
-   the License.
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-   GNU General Public License for more details.
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -984,6 +990,16 @@ struct handlerton
              true on failure
   */
   bool (*rotate_encryption_master_key)(void);
+  /**
+    Check if the given database name is reserved.
+
+    @param  hton          Handlerton for SE.
+    @param  name          Database name.
+
+    @retval true          Database name is reserved by SE.
+    @retval false         Database name is not reserved.
+  */
+  bool (*is_reserved_db_name)(handlerton *hton, const char *name);
 
    uint32 license; /* Flag for Engine License */
    void *data; /* Location for engines to keep personal structures */
@@ -1033,6 +1049,8 @@ struct handlerton
 // Engine supports packed keys.
 #define HTON_SUPPORTS_PACKED_KEYS    (1 << 12)
 
+// Engine supports table or tablespace encryption.
+#define HTON_SUPPORTS_TABLE_ENCRYPTION (1 << 13)
 enum enum_tx_isolation { ISO_READ_UNCOMMITTED, ISO_READ_COMMITTED,
 			 ISO_REPEATABLE_READ, ISO_SERIALIZABLE};
 
@@ -1158,6 +1176,7 @@ public:
   inplace_alter_handler_ctx() {}
 
   virtual ~inplace_alter_handler_ctx() {}
+  virtual void set_shared_data(const inplace_alter_handler_ctx *ctx) {};
 };
 
 
@@ -1761,7 +1780,7 @@ public:
   /// Multiply io, cpu and import costs by parameter
   void multiply(double m)
   {
-    DBUG_ASSERT(!is_max_cost());
+    assert(!is_max_cost());
 
     io_cost *= m;
     cpu_cost *= m;
@@ -1771,7 +1790,7 @@ public:
 
   Cost_estimate& operator+= (const Cost_estimate &other)
   {
-    DBUG_ASSERT(!is_max_cost() && !other.is_max_cost());
+    assert(!is_max_cost() && !other.is_max_cost());
 
     io_cost+= other.io_cost;
     cpu_cost+= other.cpu_cost;
@@ -1793,7 +1812,7 @@ public:
   {
     Cost_estimate result;
 
-    DBUG_ASSERT(!other.is_max_cost());
+    assert(!other.is_max_cost());
 
     result.io_cost= io_cost - other.io_cost;
     result.cpu_cost= cpu_cost - other.cpu_cost;
@@ -1815,28 +1834,28 @@ public:
   /// Add to IO cost
   void add_io(double add_io_cost)
   {
-    DBUG_ASSERT(!is_max_cost());
+    assert(!is_max_cost());
     io_cost+= add_io_cost;
   }
 
   /// Add to CPU cost
   void add_cpu(double add_cpu_cost)
   {
-    DBUG_ASSERT(!is_max_cost());
+    assert(!is_max_cost());
     cpu_cost+= add_cpu_cost;
   }
 
   /// Add to import cost
   void add_import(double add_import_cost)
   {
-    DBUG_ASSERT(!is_max_cost());
+    assert(!is_max_cost());
     import_cost+= add_import_cost;
   }
 
   /// Add to memory cost
   void add_mem(double add_mem_cost)
   {
-    DBUG_ASSERT(!is_max_cost());
+    assert(!is_max_cost());
     mem_cost+= add_mem_cost;
   }
 };
@@ -2200,6 +2219,11 @@ public:
     index conditions.
   */
   key_range *end_range;
+  /**
+    Flag which tells if #end_range contains a virtual generated column.
+    The content is invalid when #end_range is NULL.
+  */
+  bool m_virt_gcol_in_end_range;
   uint errkey;				/* Last dup key */
   uint key_used_on_scan;
   uint active_index;
@@ -2336,6 +2360,7 @@ public:
     estimation_rows_to_insert(0), ht(ht_arg),
     ref(0), range_scan_direction(RANGE_SCAN_ASC),
     in_range_check_pushed_down(false), end_range(NULL),
+    m_virt_gcol_in_end_range(false),
     key_used_on_scan(MAX_KEY), active_index(MAX_KEY),
     ref_length(sizeof(my_off_t)),
     ft_handler(0), inited(NONE),
@@ -2355,11 +2380,11 @@ public:
     }
   virtual ~handler(void)
   {
-    DBUG_ASSERT(m_psi == NULL);
-    DBUG_ASSERT(m_psi_batch_mode == PSI_BATCH_MODE_NONE);
-    DBUG_ASSERT(m_psi_locker == NULL);
-    DBUG_ASSERT(m_lock_type == F_UNLCK);
-    DBUG_ASSERT(inited == NONE);
+    assert(m_psi == NULL);
+    assert(m_psi_batch_mode == PSI_BATCH_MODE_NONE);
+    assert(m_psi_locker == NULL);
+    assert(m_lock_type == F_UNLCK);
+    assert(inited == NONE);
   }
   /* TODO: reorganize the methods and have proper public/protected/private qualifiers!!! */
   virtual handler *clone(const char *name, MEM_ROOT *mem_root);
@@ -2466,7 +2491,7 @@ public:
                                    uint child_table_name_len,
                                    char *child_key_name,
                                    uint child_key_name_len)
-  { DBUG_ASSERT(false); return(false); }
+  { assert(false); return(false); }
   virtual void change_table_ptr(TABLE *table_arg, TABLE_SHARE *share)
   {
     table= table_arg;
@@ -2686,9 +2711,9 @@ public:
     int error= records(num_rows);
     // A return value of HA_POS_ERROR was previously used to indicate error.
     if (error != 0)
-      DBUG_ASSERT(*num_rows == HA_POS_ERROR);
+      assert(*num_rows == HA_POS_ERROR);
     if (*num_rows == HA_POS_ERROR)
-      DBUG_ASSERT(error != 0);
+      assert(error != 0);
     if (error != 0)
     {
       /*
@@ -2725,7 +2750,7 @@ public:
   */
   virtual enum row_type get_row_type() const { return ROW_TYPE_NOT_USED; }
 
-  virtual const char *index_type(uint key_number) { DBUG_ASSERT(0); return "";}
+  virtual const char *index_type(uint key_number) { assert(0); return "";}
 
 
   /**
@@ -2761,7 +2786,7 @@ public:
   */
   virtual int exec_bulk_update(uint *dup_key_found)
   {
-    DBUG_ASSERT(FALSE);
+    assert(FALSE);
     return HA_ERR_WRONG_COMMAND;
   }
   /**
@@ -2777,7 +2802,7 @@ public:
   */
   virtual int end_bulk_delete()
   {
-    DBUG_ASSERT(FALSE);
+    assert(FALSE);
     return HA_ERR_WRONG_COMMAND;
   }
 protected:
@@ -2876,7 +2901,7 @@ public:
   virtual int rnd_pos_by_record(uchar *record)
     {
       int error;
-      DBUG_ASSERT(table_flags() & HA_PRIMARY_KEY_REQUIRED_FOR_POSITION);
+      assert(table_flags() & HA_PRIMARY_KEY_REQUIRED_FOR_POSITION);
 
       error = ha_rnd_init(FALSE);
       if (error != 0)
@@ -2900,7 +2925,7 @@ public:
   virtual void position(const uchar *record)=0;
   virtual int info(uint)=0; // see my_base.h for full description
   virtual uint32 calculate_key_hash_value(Field **field_array)
-  { DBUG_ASSERT(0); return 0; }
+  { assert(0); return 0; }
   virtual int extra(enum ha_extra_function operation)
   { return 0; }
   virtual int extra_opt(enum ha_extra_function operation, ulong cache_size)
@@ -2911,7 +2936,7 @@ public:
     @see HA_READ_BEFORE_WRITE_REMOVAL
   */
   virtual bool start_read_removal(void)
-  { DBUG_ASSERT(0); return false; }
+  { assert(0); return false; }
 
   /**
     End read (before write) removal and return the number of rows
@@ -2919,7 +2944,7 @@ public:
     @see HA_READ_BEFORE_WRITE_REMOVAL
   */
   virtual ha_rows end_read_removal(void)
-  { DBUG_ASSERT(0); return (ha_rows) 0; }
+  { assert(0); return (ha_rows) 0; }
 
   /**
     In an UPDATE or DELETE, if the row under the cursor was locked by another
@@ -3563,6 +3588,11 @@ public:
   */
   virtual void use_hidden_primary_key();
 
+/**
+  A helper function to mark a transaction as noop_read_write if it is started.
+*/
+  void mark_trx_noop_dml();
+
 protected:
   /* Service methods for use by storage engines. */
   void ha_statistic_increment(ulonglong SSV::*offset) const;
@@ -3702,7 +3732,7 @@ private:
   */
   virtual int repair(THD* thd, HA_CHECK_OPT* check_opt)
   {
-    DBUG_ASSERT(!(ha_table_flags() & HA_CAN_REPAIR));
+    assert(!(ha_table_flags() & HA_CAN_REPAIR));
     return HA_ADMIN_NOT_IMPLEMENTED;
   }
   virtual void start_bulk_insert(ha_rows rows) {}
@@ -3736,7 +3766,7 @@ public:
   virtual int bulk_update_row(const uchar *old_data, uchar *new_data,
                               uint *dup_key_found)
   {
-    DBUG_ASSERT(FALSE);
+    assert(FALSE);
     return HA_ERR_WRONG_COMMAND;
   }
   /**
@@ -3791,8 +3821,8 @@ public:
 
   virtual bool set_ha_share_ref(Handler_share **arg_ha_share)
   {
-    DBUG_ASSERT(!ha_share);
-    DBUG_ASSERT(arg_ha_share);
+    assert(!ha_share);
+    assert(arg_ha_share);
     if (ha_share || !arg_ha_share)
       return true;
     ha_share= arg_ha_share;
@@ -3880,7 +3910,7 @@ public:
     */
     if (h2)
       reset();
-    DBUG_ASSERT(h2 == NULL);
+    assert(h2 == NULL);
   }
   
   /*
@@ -3919,8 +3949,8 @@ public:
 
   void init(handler *h_arg, TABLE *table_arg)
   {
-    DBUG_ASSERT(h_arg != NULL);
-    DBUG_ASSERT(table_arg != NULL);
+    assert(h_arg != NULL);
+    assert(table_arg != NULL);
     h= h_arg; 
     table= table_arg;
   }
@@ -4163,5 +4193,6 @@ int commit_owned_gtid_by_partial_command(THD *thd);
 bool set_tx_isolation(THD *thd,
                       enum_tx_isolation tx_isolation,
                       bool one_shot);
+bool ha_check_reserved_db_name(const char *name);
 
 #endif /* HANDLER_INCLUDED */

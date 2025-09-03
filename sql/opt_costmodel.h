@@ -2,22 +2,29 @@
 #define OPT_COSTMODEL_INCLUDED
 
 /*
-   Copyright (c) 2014, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
    51 Franklin Street, Suite 500, Boston, MA 02110-1335 USA */
 
-#include "my_dbug.h"                            // DBUG_ASSERT
+#include "my_dbug.h"                            // assert
 #include "sql_const.h"                          // defines for cost constants
 #include "opt_costconstants.h"
 
@@ -39,7 +46,7 @@ public:
 
   Cost_model_server() : m_cost_constants(NULL), m_server_cost_constants(NULL)
   {
-#if !defined(DBUG_OFF)
+#if !defined(NDEBUG)
     m_initialized= false;
 #endif
   }
@@ -75,8 +82,8 @@ public:
 
   double row_evaluate_cost(double rows) const
   {
-    DBUG_ASSERT(m_initialized);
-    DBUG_ASSERT(rows >= 0.0);
+    assert(m_initialized);
+    assert(rows >= 0.0);
 
     return rows * m_server_cost_constants->row_evaluate_cost();
   }
@@ -91,8 +98,8 @@ public:
 
   double key_compare_cost(double keys) const
   {
-    DBUG_ASSERT(m_initialized);
-    DBUG_ASSERT(keys >= 0.0);
+    assert(m_initialized);
+    assert(keys >= 0.0);
 
     return keys * m_server_cost_constants->key_compare_cost();
   }
@@ -160,7 +167,7 @@ public:
 
   double tmptable_create_cost(enum_tmptable_type tmptable_type) const
   {
-    DBUG_ASSERT(m_initialized);
+    assert(m_initialized);
 
     if (tmptable_type == MEMORY_TMPTABLE)
       return memory_tmptable_create_cost();
@@ -181,9 +188,9 @@ public:
   double tmptable_readwrite_cost(enum_tmptable_type tmptable_type, 
                                  double write_rows, double read_rows) const
   {
-    DBUG_ASSERT(m_initialized);
-    DBUG_ASSERT(write_rows >= 0.0);
-    DBUG_ASSERT(read_rows >= 0.0);
+    assert(m_initialized);
+    assert(write_rows >= 0.0);
+    assert(read_rows >= 0.0);
 
     return (write_rows + read_rows) * tmptable_row_cost(tmptable_type);
   }
@@ -198,7 +205,7 @@ protected:
 
   const Cost_model_constants *get_cost_constants() const
   {
-    DBUG_ASSERT(m_initialized);
+    assert(m_initialized);
 
     return m_cost_constants;
   }
@@ -215,7 +222,7 @@ protected: // To be able make a gunit fake sub class
   */
   const Server_cost_constants *m_server_cost_constants;
 
-#if !defined(DBUG_OFF)
+#if !defined(NDEBUG)
   /**
     Used for detecting if this object is used without having been initialized.
   */
@@ -237,7 +244,7 @@ public:
   Cost_model_table() : m_cost_model_server(NULL), m_se_cost_constants(NULL),
     m_table(NULL)
   {
-#if !defined(DBUG_OFF)
+#if !defined(NDEBUG)
     m_initialized= false;
 #endif
   }
@@ -267,8 +274,8 @@ public:
 
   double row_evaluate_cost(double rows) const
   {
-    DBUG_ASSERT(m_initialized);
-    DBUG_ASSERT(rows >= 0.0);
+    assert(m_initialized);
+    assert(rows >= 0.0);
 
     return m_cost_model_server->row_evaluate_cost(rows);
   }
@@ -283,8 +290,8 @@ public:
 
   double key_compare_cost(double keys) const
    {
-    DBUG_ASSERT(m_initialized);
-    DBUG_ASSERT(keys >= 0.0);
+     assert(m_initialized);
+     assert(keys >= 0.0);
 
     return m_cost_model_server->key_compare_cost(keys);
   }
@@ -299,8 +306,8 @@ public:
 
   double io_block_read_cost(double blocks) const
   {
-    DBUG_ASSERT(m_initialized);
-    DBUG_ASSERT(blocks >= 0.0);
+    assert(m_initialized);
+    assert(blocks >= 0.0);
 
     return blocks * m_se_cost_constants->io_block_read_cost();
   }
@@ -316,8 +323,8 @@ public:
 
   double buffer_block_read_cost(double blocks) const
   {
-    DBUG_ASSERT(m_initialized);
-    DBUG_ASSERT(blocks >= 0.0);
+    assert(m_initialized);
+    assert(blocks >= 0.0);
 
     return blocks * m_se_cost_constants->memory_block_read_cost();
   }
@@ -352,7 +359,7 @@ public:
 
   double disk_seek_base_cost() const
   {
-    DBUG_ASSERT(m_initialized);
+    assert(m_initialized);
 
     return DISK_SEEK_BASE_COST * io_block_read_cost(1.0);
   }
@@ -387,8 +394,8 @@ public:
 
   double disk_seek_cost(double seek_blocks) const
   {
-    DBUG_ASSERT(seek_blocks >= 0.0);
-    DBUG_ASSERT(m_initialized);
+    assert(seek_blocks >= 0.0);
+    assert(m_initialized);
 
     const double cost= disk_seek_base_cost() +
                        disk_seek_prop_cost() * seek_blocks;
@@ -407,7 +414,7 @@ protected: // To be able make a gunit fake sub class
   */
   const SE_cost_constants *m_se_cost_constants;
 
-#if !defined(DBUG_OFF)
+#if !defined(NDEBUG)
   /**
     Used for detecting if this object is used without having been initialized.
   */

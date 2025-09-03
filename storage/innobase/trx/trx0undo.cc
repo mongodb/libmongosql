@@ -1,14 +1,22 @@
 /*****************************************************************************
 
-Copyright (c) 1996, 2016, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1996, 2023, Oracle and/or its affiliates.
 
-This program is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation; version 2 of the License.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License, version 2.0,
+as published by the Free Software Foundation.
 
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is also distributed with certain software (including
+but not limited to OpenSSL) that is licensed under separate terms,
+as designated in a particular file or component or in included license
+documentation.  The authors of MySQL hereby grant you an additional
+permission to link the program and your derivative works with the
+separately licensed software that they have included with MySQL.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License, version 2.0, for more details.
 
 You should have received a copy of the GNU General Public License along with
 this program; if not, write to the Free Software Foundation, Inc.,
@@ -1519,7 +1527,6 @@ trx_undo_mem_create(
 	undo->empty = TRUE;
 	undo->top_page_no = page_no;
 	undo->guess_block = NULL;
-	undo->withdraw_clock = 0;
 
 	return(undo);
 }
@@ -2173,6 +2180,24 @@ trx_undo_truncate_tablespace(
 		rseg->last_offset = 0;
 		rseg->last_trx_no = 0;
 		rseg->last_del_marks = FALSE;
+	}
+
+	/* During Upgrade, existing rsegs in range from slot-1....slot-32
+	were added into the array pending_purge_rseg_array[]. These rsegs also
+	reside in system or undo tablespace. */
+	trx_sysf_t* sys_header = trx_sysf_get(&mtr);
+	for (ulint i = 0; i < TRX_SYS_N_RSEGS; ++i) {
+		trx_rseg_t*	rseg = trx_sys->pending_purge_rseg_array[i];
+		if(rseg != NULL
+			&& rseg->space == undo_trunc->get_marked_space_id()) {
+			/* Reset the rollback segment slot in the trx
+			system header */
+			trx_sysf_rseg_set_page_no(
+				sys_header, rseg->id, FIL_NULL, &mtr);
+			/* Free a pending rollback segment instance in memory */
+			trx_rseg_mem_free(rseg,
+				trx_sys->pending_purge_rseg_array);
+		}
 	}
 	mtr_commit(&mtr);
 

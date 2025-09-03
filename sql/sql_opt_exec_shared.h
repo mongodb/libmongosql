@@ -1,13 +1,20 @@
-/* Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -147,7 +154,7 @@ typedef struct st_table_ref : public Sql_alloc
 
   bool has_guarded_conds() const
   {
-    DBUG_ASSERT(key_parts == 0 || cond_guards != NULL);
+    assert(key_parts == 0 || cond_guards != NULL);
 
     for (uint i = 0; i < key_parts; i++)
     {
@@ -265,12 +272,12 @@ public:
   void set_join(JOIN *j) { m_join= j; }
   plan_idx idx() const
   {
-    DBUG_ASSERT(m_idx >= 0);                    // Index must be valid
+    assert(m_idx >= 0);                    // Index must be valid
     return m_idx;
   }
   void set_idx(plan_idx i)
   {
-    DBUG_ASSERT(m_idx == NO_PLAN_IDX);      // Index should not change in lifetime
+    assert(m_idx == NO_PLAN_IDX);      // Index should not change in lifetime
     m_idx= i;
   }
   TABLE *table() const { return m_table; }
@@ -459,7 +466,7 @@ public:
 
   /// Instructs to share the QEP_shared with another owner
   void share_qs(QEP_shared_owner *other) { other->set_qs(m_qs); }
-  void set_qs(QEP_shared *q) { DBUG_ASSERT(!m_qs); m_qs= q; }
+  void set_qs(QEP_shared *q) { assert(!m_qs); m_qs= q; }
 
   // Getters/setters forwarding to QEP_shared:
 

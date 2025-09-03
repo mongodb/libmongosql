@@ -1,14 +1,21 @@
 /*
-   Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -569,6 +576,12 @@ int mysql_create_db(THD *thd, const char *db, HA_CREATE_INFO *create_info,
   if (is_infoschema_db(db))
   {
     my_error(ER_DB_CREATE_EXISTS, MYF(0), db);
+    DBUG_RETURN(-1);
+  }
+
+  if (ha_check_reserved_db_name(db))
+  {
+    my_error(ER_WRONG_DB_NAME, MYF(0), db);
     DBUG_RETURN(-1);
   }
 
@@ -1605,18 +1618,15 @@ bool mysql_change_db(THD *thd, const LEX_CSTRING &new_db_name,
   DBUG_PRINT("info",("Use database: %s", new_db_file_name.str));
 
 #ifndef NO_EMBEDDED_ACCESS_CHECKS
-  db_access= sctx->check_access(DB_ACLS) ?
-    DB_ACLS :
-    acl_get(sctx->host().str,
-            sctx->ip().str,
-            sctx->priv_user().str,
-            new_db_file_name.str,
-            false) | sctx->master_access();
+  db_access =
+      sctx->check_access(DB_OP_ACLS)
+          ? DB_OP_ACLS
+          : acl_get(sctx->host().str, sctx->ip().str, sctx->priv_user().str,
+                    new_db_file_name.str, false) |
+                sctx->master_access();
 
-  if (!force_switch &&
-      !(db_access & DB_ACLS) &&
-      check_grant_db(thd, new_db_file_name.str))
-  {
+  if (!force_switch && !(db_access & DB_OP_ACLS) &&
+      check_grant_db(thd, new_db_file_name.str, true)) {
     my_error(ER_DBACCESS_DENIED_ERROR, MYF(0),
              sctx->priv_user().str,
              sctx->priv_host().str,

@@ -1,6 +1,6 @@
 /*****************************************************************************
 
-Copyright (c) 1995, 2016, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 1995, 2023, Oracle and/or its affiliates.
 Copyright (c) 2008, Google Inc.
 
 Portions of this file contain modifications contributed and copyrighted by
@@ -9,13 +9,21 @@ briefly in the InnoDB documentation. The contributions by Google are
 incorporated with their permission, and subject to the conditions contained in
 the file COPYING.Google.
 
-This program is free software; you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software
-Foundation; version 2 of the License.
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License, version 2.0,
+as published by the Free Software Foundation.
 
-This program is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is also distributed with certain software (including
+but not limited to OpenSSL) that is licensed under separate terms,
+as designated in a particular file or component or in included license
+documentation.  The authors of MySQL hereby grant you an additional
+permission to link the program and your derivative works with the
+separately licensed software that they have included with MySQL.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License, version 2.0, for more details.
 
 You should have received a copy of the GNU General Public License along with
 this program; if not, write to the Free Software Foundation, Inc.,
@@ -340,9 +348,13 @@ rw_lock_s_lock_spin(
 	sync_array_t*	sync_arr;
 	ulint		spin_count = 0;
 	uint64_t	count_os_wait = 0;
+	const os_thread_id_t curr_thread = os_thread_get_curr_id();
 
 	/* We reuse the thread id to index into the counter, cache
 	it here for efficiency. */
+
+	const size_t counter_index = (size_t) ut_rnd_gen_next_ulint(
+							(ulint) curr_thread);
 
 	ut_ad(rw_lock_validate(lock));
 
@@ -370,10 +382,12 @@ lock_loop:
 		if (count_os_wait > 0) {
 			lock->count_os_wait +=
 				static_cast<uint32_t>(count_os_wait);
-			rw_lock_stats.rw_s_os_wait_count.add(count_os_wait);
+			rw_lock_stats.rw_s_os_wait_count.add(counter_index,
+							     count_os_wait);
 		}
 
-		rw_lock_stats.rw_s_spin_round_count.add(spin_count);
+		rw_lock_stats.rw_s_spin_round_count.add(counter_index,
+							spin_count);
 
 		return; /* Success */
 	} else {
@@ -404,10 +418,11 @@ lock_loop:
 					static_cast<uint32_t>(count_os_wait);
 
 				rw_lock_stats.rw_s_os_wait_count.add(
-					count_os_wait);
+					counter_index, count_os_wait);
 			}
 
-			rw_lock_stats.rw_s_spin_round_count.add(spin_count);
+			rw_lock_stats.rw_s_spin_round_count.add(counter_index,
+								spin_count);
 
 			return; /* Success */
 		}
@@ -415,7 +430,7 @@ lock_loop:
 		/* see comments in trx_commit_low() to
 		before_trx_state_committed_in_memory explaining
 		this care to invoke the following sync check.*/
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 #ifdef UNIV_DEBUG
 		if (lock->get_level() != SYNC_DICT_OPERATION) {
 			DEBUG_SYNC_C("rw_s_lock_waiting");
@@ -444,9 +459,11 @@ rw_lock_x_lock_move_ownership(
 	rw_lock_t*	lock)	/*!< in: lock which was x-locked in the
 				buffer read */
 {
+	const os_thread_id_t curr_thread = os_thread_get_curr_id();
+
 	ut_ad(rw_lock_is_locked(lock, RW_LOCK_X));
 
-	rw_lock_set_writer_id_and_recursion_flag(lock, true);
+	rw_lock_set_writer_id_and_recursion_flag(lock, true, curr_thread);
 }
 
 /******************************************************************//**
@@ -462,6 +479,7 @@ rw_lock_x_lock_wait_func(
 				be passed to another thread to unlock */
 #endif
 	lint		threshold,/*!< in: threshold to wait for */
+	const os_thread_id_t curr_thread,/*!< in: current thread id */
 	const char*	file_name,/*!< in: file name where lock requested */
 	ulint		line)	/*!< in: line where requested */
 {
@@ -469,6 +487,12 @@ rw_lock_x_lock_wait_func(
 	ulint		n_spins = 0;
 	sync_array_t*	sync_arr;
 	uint64_t	count_os_wait = 0;
+	size_t		counter_index;
+
+	/* We reuse the thread id to index into the counter, cache
+	it here for efficiency. */
+
+	counter_index = (size_t) ut_rnd_gen_next_ulint((ulint) curr_thread);
 
 	os_rmb;
 	ut_ad(lock->lock_word <= threshold);
@@ -521,21 +545,22 @@ rw_lock_x_lock_wait_func(
 		}
 	}
 
-	rw_lock_stats.rw_x_spin_round_count.add(n_spins);
+	rw_lock_stats.rw_x_spin_round_count.add(counter_index, n_spins);
 
 	if (count_os_wait > 0) {
 		lock->count_os_wait +=
 			static_cast<uint32_t>(count_os_wait);
-		rw_lock_stats.rw_x_os_wait_count.add(count_os_wait);
+		rw_lock_stats.rw_x_os_wait_count.add(counter_index,
+						     count_os_wait);
 	}
 }
 
 #ifdef UNIV_DEBUG
-# define rw_lock_x_lock_wait(L, P, T, F, O)		\
-	rw_lock_x_lock_wait_func(L, P, T, F, O)
+# define rw_lock_x_lock_wait(L, P, T, C, F, O)		\
+	rw_lock_x_lock_wait_func(L, P, T, C, F, O)
 #else
-# define rw_lock_x_lock_wait(L, P, T, F, O)		\
-	rw_lock_x_lock_wait_func(L, T, F, O)
+# define rw_lock_x_lock_wait(L, P, T, C, F, O)		\
+	rw_lock_x_lock_wait_func(L, T, C, F, O)
 #endif /* UNIV_DBEUG */
 
 /******************************************************************//**
@@ -548,6 +573,7 @@ rw_lock_x_lock_low(
 	rw_lock_t*	lock,	/*!< in: pointer to rw-lock */
 	ulint		pass,	/*!< in: pass value; != 0, if the lock will
 				be passed to another thread to unlock */
+	const os_thread_id_t curr_thread,/*!< in: current thread id */
 	const char*	file_name,/*!< in: file name where lock requested */
 	ulint		line)	/*!< in: line where requested */
 {
@@ -561,22 +587,25 @@ rw_lock_x_lock_low(
 
 		/* Decrement occurred: we are writer or next-writer. */
 		rw_lock_set_writer_id_and_recursion_flag(
-			lock, !pass);
+			lock, !pass, curr_thread);
 
-		rw_lock_x_lock_wait(lock, pass, 0, file_name, line);
+		rw_lock_x_lock_wait(lock, pass, 0, curr_thread,
+				    file_name, line);
 
 	} else {
-		os_thread_id_t	thread_id = os_thread_get_curr_id();
+		bool recursive;
+		os_thread_id_t writer_thread;
 
 		if (!pass) {
+			recursive = lock->recursive;
 			os_rmb;
+			writer_thread = lock->writer_thread;
 		}
 
 		/* Decrement failed: An X or SX lock is held by either
 		this thread or another. Try to relock. */
-		if (!pass
-		    && lock->recursive
-		    && os_thread_eq(lock->writer_thread, thread_id)) {
+		if (!pass && recursive
+		    && os_thread_eq(writer_thread, curr_thread)) {
 			/* Other s-locks can be allowed. If it is request x
 			recursively while holding sx lock, this x lock should
 			be along with the latching-order. */
@@ -590,7 +619,7 @@ rw_lock_x_lock_low(
 				released. */
 				rw_lock_x_lock_wait(
 					lock, pass, -X_LOCK_HALF_DECR,
-					file_name, line);
+					curr_thread, file_name, line);
 
 			} else {
 				/* At least one X lock by this thread already
@@ -621,12 +650,14 @@ rw_lock_x_lock_low(
 /******************************************************************//**
 Low-level function for acquiring an sx lock.
 @return FALSE if did not succeed, TRUE if success. */
+UNIV_INLINE
 ibool
 rw_lock_sx_lock_low(
 /*================*/
 	rw_lock_t*	lock,	/*!< in: pointer to rw-lock */
 	ulint		pass,	/*!< in: pass value; != 0, if the lock will
 				be passed to another thread to unlock */
+	const os_thread_id_t curr_thread,/*!< in: current thread id */
 	const char*	file_name,/*!< in: file name where lock requested */
 	ulint		line)	/*!< in: line where requested */
 {
@@ -640,22 +671,25 @@ rw_lock_sx_lock_low(
 
 		/* Decrement occurred: we are the SX lock owner. */
 		rw_lock_set_writer_id_and_recursion_flag(
-			lock, !pass);
+			lock, !pass, curr_thread);
 
 		lock->sx_recursive = 1;
 
 	} else {
-		os_thread_id_t	thread_id = os_thread_get_curr_id();
+		bool recursive;
+		os_thread_id_t writer_thread;
 
 		if (!pass) {
+			recursive = lock->recursive;
 			os_rmb;
+			writer_thread = lock->writer_thread;
 		}
 
 		/* Decrement failed: It already has an X or SX lock by this
 		thread or another thread. If it is this thread, relock,
 		else fail. */
-		if (!pass && lock->recursive
-		    && os_thread_eq(lock->writer_thread, thread_id)) {
+		if (!pass && recursive
+		    && os_thread_eq(writer_thread, curr_thread)) {
 			/* This thread owns an X or SX lock */
 			if (lock->sx_recursive++ == 0) {
 				/* This thread is making first SX-lock request
@@ -720,21 +754,30 @@ rw_lock_x_lock_func(
 	sync_array_t*	sync_arr;
 	ulint		spin_count = 0;
 	uint64_t	count_os_wait = 0;
+	const os_thread_id_t curr_thread = os_thread_get_curr_id();
+
+	/* We reuse the thread id to index into the counter, cache
+	it here for efficiency. */
+
+	const size_t counter_index = (size_t) ut_rnd_gen_next_ulint(
+							(ulint) curr_thread);
 
 	ut_ad(rw_lock_validate(lock));
 	ut_ad(!rw_lock_own(lock, RW_LOCK_S));
 
 lock_loop:
 
-	if (rw_lock_x_lock_low(lock, pass, file_name, line)) {
+	if (rw_lock_x_lock_low(lock, pass, curr_thread, file_name, line)) {
 
 		if (count_os_wait > 0) {
 			lock->count_os_wait +=
 				static_cast<uint32_t>(count_os_wait);
-			rw_lock_stats.rw_x_os_wait_count.add(count_os_wait);
+			rw_lock_stats.rw_x_os_wait_count.add(counter_index,
+							     count_os_wait);
 		}
 
-		rw_lock_stats.rw_x_spin_round_count.add(spin_count);
+		rw_lock_stats.rw_x_spin_round_count.add(counter_index,
+							spin_count);
 
 		/* Locking succeeded */
 		return;
@@ -775,16 +818,18 @@ lock_loop:
 	is sent. This could lead to a few unnecessary wake-up signals. */
 	rw_lock_set_waiter_flag(lock);
 
-	if (rw_lock_x_lock_low(lock, pass, file_name, line)) {
+	if (rw_lock_x_lock_low(lock, pass, curr_thread, file_name, line)) {
 		sync_array_free_cell(sync_arr, cell);
 
 		if (count_os_wait > 0) {
 			lock->count_os_wait +=
 				static_cast<uint32_t>(count_os_wait);
-			rw_lock_stats.rw_x_os_wait_count.add(count_os_wait);
+			rw_lock_stats.rw_x_os_wait_count.add(counter_index,
+							     count_os_wait);
 		}
 
-		rw_lock_stats.rw_x_spin_round_count.add(spin_count);
+		rw_lock_stats.rw_x_spin_round_count.add(counter_index,
+							spin_count);
 
 		/* Locking succeeded */
 		return;
@@ -823,22 +868,32 @@ rw_lock_sx_lock_func(
 	ulint		spin_count = 0;
 	uint64_t	count_os_wait = 0;
 	ulint		spin_wait_count = 0;
+	const os_thread_id_t curr_thread = os_thread_get_curr_id();
+
+	/* We reuse the thread id to index into the counter, cache
+	it here for efficiency. */
+
+	const size_t counter_index = (size_t) ut_rnd_gen_next_ulint(
+							(ulint) curr_thread);
 
 	ut_ad(rw_lock_validate(lock));
 	ut_ad(!rw_lock_own(lock, RW_LOCK_S));
 
 lock_loop:
 
-	if (rw_lock_sx_lock_low(lock, pass, file_name, line)) {
+	if (rw_lock_sx_lock_low(lock, pass, curr_thread, file_name, line)) {
 
 		if (count_os_wait > 0) {
 			lock->count_os_wait +=
 				static_cast<uint32_t>(count_os_wait);
-			rw_lock_stats.rw_sx_os_wait_count.add(count_os_wait);
+			rw_lock_stats.rw_sx_os_wait_count.add(counter_index,
+							      count_os_wait);
 		}
 
-		rw_lock_stats.rw_sx_spin_round_count.add(spin_count);
-		rw_lock_stats.rw_sx_spin_wait_count.add(spin_wait_count);
+		rw_lock_stats.rw_sx_spin_round_count.add(counter_index,
+							 spin_count);
+		rw_lock_stats.rw_sx_spin_wait_count.add(counter_index,
+							spin_wait_count);
 
 		/* Locking succeeded */
 		return;
@@ -881,18 +936,21 @@ lock_loop:
 	is sent. This could lead to a few unnecessary wake-up signals. */
 	rw_lock_set_waiter_flag(lock);
 
-	if (rw_lock_sx_lock_low(lock, pass, file_name, line)) {
+	if (rw_lock_sx_lock_low(lock, pass, curr_thread, file_name, line)) {
 
 		sync_array_free_cell(sync_arr, cell);
 
 		if (count_os_wait > 0) {
 			lock->count_os_wait +=
 				static_cast<uint32_t>(count_os_wait);
-			rw_lock_stats.rw_sx_os_wait_count.add(count_os_wait);
+			rw_lock_stats.rw_sx_os_wait_count.add(counter_index,
+							      count_os_wait);
 		}
 
-		rw_lock_stats.rw_sx_spin_round_count.add(spin_count);
-		rw_lock_stats.rw_sx_spin_wait_count.add(spin_wait_count);
+		rw_lock_stats.rw_sx_spin_round_count.add(counter_index,
+							 spin_count);
+		rw_lock_stats.rw_sx_spin_wait_count.add(counter_index,
+							spin_wait_count);
 
 		/* Locking succeeded */
 		return;
@@ -905,6 +963,25 @@ lock_loop:
 	i = 0;
 
 	goto lock_loop;
+}
+
+/******************************************************************//**
+NOTE! Use the corresponding macro, not directly this function! Lock an
+rw-lock in SX mode for the current thread if the lock can be
+obtained immediately.
+@return FALSE if did not succeed, TRUE if success. */
+ibool
+rw_lock_sx_lock_func_nowait(
+/*========================*/
+	rw_lock_t*	lock,	/*!< in: pointer to rw-lock */
+	ulint		pass,	/*!< in: pass value; != 0, if the lock will
+				be passed to another thread to unlock */
+	const char*	file_name,/*!< in: file name where lock requested */
+	ulint		line)	/*!< in: line where requested */
+{
+	const os_thread_id_t curr_thread = os_thread_get_curr_id();
+
+	return(rw_lock_sx_lock_low(lock, pass, curr_thread, file_name, line));
 }
 
 #ifdef UNIV_DEBUG

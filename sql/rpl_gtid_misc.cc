@@ -1,14 +1,20 @@
-/* Copyright (c) 2012, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2012, 2023, Oracle and/or its affiliates.
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License as
-   published by the Free Software Foundation; version 2 of the
-   License.
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
 
-   This program is distributed in the hope that it will be useful, but
-   WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-   General Public License for more details.
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -180,7 +186,7 @@ int Gtid::to_string(const Sid_map *sid_map, char *buf, bool need_lock) const
   }
   else
   {
-#ifdef DBUG_OFF
+#ifdef NDEBUG
     /*
       NULL is only allowed in debug mode, since the sidno does not
       make sense for users but is useful to include in debug
@@ -235,16 +241,16 @@ bool Gtid::is_valid(const char *text)
 }
 
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 void check_return_status(enum_return_status status, const char *action,
                          const char *status_name, int allow_unreported)
 {
   if (status != RETURN_STATUS_OK)
   {
-    DBUG_ASSERT(allow_unreported || status == RETURN_STATUS_REPORTED_ERROR);
+    assert(allow_unreported || status == RETURN_STATUS_REPORTED_ERROR);
     if (status == RETURN_STATUS_REPORTED_ERROR)
     {
-#if !defined(MYSQL_CLIENT) && !defined(DBUG_OFF)
+#if !defined(MYSQL_CLIENT) && !defined(NDEBUG)
       THD *thd= current_thd;
       /*
         We create a new system THD with 'SYSTEM_THREAD_COMPRESS_GTID_TABLE'
@@ -253,16 +259,16 @@ void check_return_status(enum_return_status status, const char *action,
         assert in this case. We assert that diagnostic area logged the error
         outside server startup since the assert is realy useful.
      */
-      DBUG_ASSERT(thd == NULL ||
-                  thd->get_stmt_da()->status() == Diagnostics_area::DA_ERROR ||
-                  (thd->get_stmt_da()->status() == Diagnostics_area::DA_EMPTY &&
-                   thd->system_thread == SYSTEM_THREAD_COMPRESS_GTID_TABLE));
+      assert(thd == NULL ||
+             thd->get_stmt_da()->status() == Diagnostics_area::DA_ERROR ||
+             (thd->get_stmt_da()->status() == Diagnostics_area::DA_EMPTY &&
+              thd->system_thread == SYSTEM_THREAD_COMPRESS_GTID_TABLE));
 #endif
     }
     DBUG_PRINT("info", ("%s error %d (%s)", action, status, status_name));
   }
 }
-#endif // ! DBUG_OFF
+#endif // ! NDEBUG
 
 
 #ifndef MYSQL_CLIENT

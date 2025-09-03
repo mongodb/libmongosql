@@ -1,14 +1,20 @@
-/* Copyright (c) 2014, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License as
-   published by the Free Software Foundation; version 2 of the
-   License.
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
 
-   This program is distributed in the hope that it will be useful, but
-   WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-   General Public License for more details.
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -58,8 +64,8 @@ public:
   ~Attachable_trx_rw()
   {
     /* The attachable transaction has been already committed */
-    DBUG_ASSERT(!m_thd->get_transaction()->is_active(Transaction_ctx::STMT)
-                && !m_thd->get_transaction()->is_active(Transaction_ctx::SESSION));
+    assert(!m_thd->get_transaction()->is_active(Transaction_ctx::STMT)
+           && !m_thd->get_transaction()->is_active(Transaction_ctx::SESSION));
 
     m_thd->get_transaction()->xid_state()->set_state(m_xa_state_saved);
     m_thd->tx_read_only= true;
@@ -80,7 +86,7 @@ bool THD::is_attachable_rw_transaction_active() const
 
 void THD::begin_attachable_rw_transaction()
 {
-  DBUG_ASSERT(!m_attachable_trx);
+  assert(!m_attachable_trx);
 
   m_attachable_trx= new Attachable_trx_rw(this);
 }
@@ -132,10 +138,15 @@ THD *Gtid_table_access_context::create_thd()
   */
   lex_start(thd);
   mysql_reset_thd_for_next_command(thd);
-
+  thd->set_skip_readonly_check();
   return(thd);
 }
 
+void Gtid_table_access_context::drop_thd(THD *thd)
+{
+  thd->reset_skip_readonly_check();
+  System_table_access::drop_thd(thd);
+}
 
 void Gtid_table_access_context::before_open(THD* thd)
 {
@@ -174,10 +185,10 @@ bool Gtid_table_access_context::init(THD **thd, TABLE **table, bool is_write)
       the main transaction thanks to rejection to update
       'mysql.gtid_executed' by XA main transaction.
     */
-    DBUG_ASSERT((*thd)->get_transaction()->xid_state()->
-                has_state(XID_STATE::XA_IDLE) ||
-                (*thd)->get_transaction()->xid_state()->
-                has_state(XID_STATE::XA_PREPARED));
+    assert((*thd)->get_transaction()->xid_state()->
+           has_state(XID_STATE::XA_IDLE) ||
+           (*thd)->get_transaction()->xid_state()->
+           has_state(XID_STATE::XA_PREPARED));
 
     (*thd)->begin_attachable_rw_transaction();
   }
@@ -513,7 +524,7 @@ int Gtid_table_persistor::save(TABLE *table, const Gtid_set *gtid_set)
     @retval 0    OK.
     @retval -1   Error.
 */
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 static int dbug_test_on_compress(THD *thd)
 {
   DBUG_ENTER("dbug_test_on_compress");
@@ -525,9 +536,9 @@ static int dbug_test_on_compress(THD *thd)
   DBUG_EXECUTE_IF("fetch_compression_thread_stage_info",
                   {
                     const char act[]= "now signal fetch_thread_stage";
-                    DBUG_ASSERT(opt_debug_sync_timeout > 0);
-                    DBUG_ASSERT(!debug_sync_set_action(thd,
-                                                       STRING_WITH_LEN(act)));
+                    assert(opt_debug_sync_timeout > 0);
+                    assert(!debug_sync_set_action(thd,
+                                                  STRING_WITH_LEN(act)));
                   };);
   /* Sleep a little, so that we can always fetch the correct stage info. */
   DBUG_EXECUTE_IF("fetch_compression_thread_stage_info", sleep(1););
@@ -539,9 +550,9 @@ static int dbug_test_on_compress(THD *thd)
   DBUG_EXECUTE_IF("simulate_crash_on_compress_gtid_table",
                   {
                     const char act[]= "now wait_for notified_thread_complete";
-                    DBUG_ASSERT(opt_debug_sync_timeout > 0);
-                    DBUG_ASSERT(!debug_sync_set_action(thd,
-                                                       STRING_WITH_LEN(act)));
+                    assert(opt_debug_sync_timeout > 0);
+                    assert(!debug_sync_set_action(thd,
+                                                  STRING_WITH_LEN(act)));
                   };);
   DBUG_EXECUTE_IF("simulate_crash_on_compress_gtid_table", DBUG_SUICIDE(););
 
@@ -564,9 +575,9 @@ int Gtid_table_persistor::compress(THD *thd)
   DBUG_EXECUTE_IF("compress_gtid_table",
                   {
                     const char act[]= "now signal complete_compression";
-                    DBUG_ASSERT(opt_debug_sync_timeout > 0);
-                    DBUG_ASSERT(!debug_sync_set_action(thd,
-                                                       STRING_WITH_LEN(act)));
+                    assert(opt_debug_sync_timeout > 0);
+                    assert(!debug_sync_set_action(thd,
+                                                  STRING_WITH_LEN(act)));
                   };);
 
   DBUG_RETURN(error);
@@ -597,7 +608,7 @@ int Gtid_table_persistor::compress_in_single_transaction(THD *thd,
   if ((error= compress_first_consecutive_range(table, is_complete)))
     goto end;
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   error= dbug_test_on_compress(thd);
 #endif
 
@@ -888,9 +899,9 @@ extern "C" void *compress_gtid_table(void *p_thd)
       DBUG_EXECUTE_IF("simulate_error_on_compress_gtid_table",
                       {
                         const char act[]= "now signal compression_failed";
-                        DBUG_ASSERT(opt_debug_sync_timeout > 0);
-                        DBUG_ASSERT(!debug_sync_set_action(current_thd,
-                                                           STRING_WITH_LEN(act)));
+                        assert(opt_debug_sync_timeout > 0);
+                        assert(!debug_sync_set_action(current_thd,
+                                                      STRING_WITH_LEN(act)));
                       };);
     }
   }

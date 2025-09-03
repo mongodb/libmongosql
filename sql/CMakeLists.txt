@@ -1,14 +1,21 @@
-# Copyright (c) 2006, 2018, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2006, 2023, Oracle and/or its affiliates.
 # 
 # This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; version 2 of the License.
-# 
+# it under the terms of the GNU General Public License, version 2.0,
+# as published by the Free Software Foundation.
+#
+# This program is also distributed with certain software (including
+# but not limited to OpenSSL) that is licensed under separate terms,
+# as designated in a particular file or component or in included license
+# documentation.  The authors of MySQL hereby grant you an additional
+# permission to link the program and your derivative works with the
+# separately licensed software that they have included with MySQL.
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-# 
+# GNU General Public License, version 2.0, for more details.
+#
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
@@ -21,10 +28,8 @@ INCLUDE_DIRECTORIES(
   ${CMAKE_SOURCE_DIR}/sql 
   ${CMAKE_SOURCE_DIR}/sql/auth
   ${CMAKE_SOURCE_DIR}/regex 
-  ${ZLIB_INCLUDE_DIR}
   ${SSL_INCLUDE_DIRS}
   ${CMAKE_BINARY_DIR}/sql
-  ${LZ4_INCLUDE_DIR}
 )
 
 SET(CONF_SOURCES
@@ -117,6 +122,7 @@ SET(SQL_SHARED_SOURCES
   keycaches.cc
   lock.cc
   locking_service.cc
+  locks/shared_spin_lock.cc
   log.cc
   mdl.cc
   migrate_keyring.cc
@@ -213,8 +219,10 @@ SET(SQL_SHARED_SOURCES
   sql_rewrite.cc
   sql_select.cc
   sql_servers.cc
+  sql_cmd_show.cc
   sql_show.cc
   sql_show_status.cc
+  sql_show_processlist.cc
   sql_signal.cc
   sql_state.c
   sql_table.cc
@@ -257,7 +265,7 @@ SET(SQL_SOURCE
   ${GEN_DIGEST_SOURCES}
   ${CONF_SOURCES}
   ${SQL_SHARED_SOURCES}
-  ../extra/lz4/xxhash.c
+  ${BUNDLED_LZ4_PATH}/xxhash.c
   ../libmysql/errmsg.c
   ../sql-common/inet_pton.c
   ../sql-common/strcase.c
@@ -276,6 +284,7 @@ SET(SQL_SOURCE
   conn_handler/connection_handler_per_thread.cc
   conn_handler/connection_handler_one_thread.cc
   conn_handler/socket_connection.cc
+  conn_handler/init_net_server_extension.cc
   des_key_file.cc
   event_data_objects.cc
   event_db_repository.cc 
@@ -296,6 +305,14 @@ SET(SQL_SOURCE
   auth/sha2_password_common.cc
   )
 
+DOWNGRADE_OPENSSL3_DEPRECATION_WARNINGS(
+  ${CMAKE_SOURCE_DIR}/sql-common/client_authentication.cc
+  ${CMAKE_SOURCE_DIR}/sql/auth/auth_common.h
+  ${CMAKE_SOURCE_DIR}/sql/auth/sql_authentication.cc
+  ${CMAKE_SOURCE_DIR}/sql/auth/sql_authentication.h
+  ${CMAKE_SOURCE_DIR}/sql/des_key_file.cc
+  ${CMAKE_SOURCE_DIR}/sql/item_strfunc.cc)
+
 IF(NOT WIN32)
   LIST(APPEND SQL_SOURCE mysqld_daemon.cc)
 ENDIF()
@@ -315,9 +332,14 @@ INCLUDE_DIRECTORIES(SYSTEM
   )
 
 ADD_COMPILE_FLAGS(
-  ../extra/lz4/xxhash.c
-  COMPILE_FLAGS -DXXH_NAMESPACE=MY_
+  ${BUNDLED_LZ4_PATH}/xxhash.c
+  COMPILE_FLAGS -DXXH_NAMESPACE=MY_ -I${BUNDLED_LZ4_PATH}
 )
+
+ADD_COMPILE_FLAGS(
+  rpl_write_set_handler.cc
+  COMPILE_FLAGS -I${CMAKE_SOURCE_DIR}/extra/lz4 -I${BUNDLED_LZ4_PATH}
+  )
 
 # Fixes "C1128: number of sections exceeded object file format limit" in MSVC
 IF(WIN32 AND CMAKE_SIZEOF_VOID_P MATCHES 8)
@@ -346,9 +368,17 @@ ENDIF()
 # Segfault in boost::geometry code at high optimization levels
 IF(CMAKE_CXX_COMPILER_ID MATCHES "SunPro")
   STRING(TOUPPER "${CMAKE_BUILD_TYPE}" CMAKEBT)
-  IF(CMAKEBT MATCHES "^REL")
+  IF(CMAKEBT MATCHES "REL")
     ADD_COMPILE_FLAGS(item_geofunc_buffer.cc COMPILE_FLAGS "-xO2")
   ENDIF()
+ENDIF()
+
+# MD5_Init() MD5_Update() MD5_Final() are all deprecated
+IF(SOLARIS AND CMAKE_COMPILER_IS_GNUCXX)
+  ADD_COMPILE_FLAGS(
+    des_key_file.cc
+    item_strfunc.cc
+    COMPILE_FLAGS "-Wno-deprecated-declarations")
 ENDIF()
 
 # Boost source has misleading indentation
@@ -374,6 +404,14 @@ IF(HAVE_MAYBE_UNINITIALIZED)
   ADD_COMPILE_FLAGS(
     geometry_rtree.cc
     COMPILE_FLAGS "-Wno-maybe-uninitialized")
+ENDIF()
+
+# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98753
+IF(MY_COMPILER_IS_GNU AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11)
+  ADD_COMPILE_FLAGS(
+    ${CMAKE_CURRENT_BINARY_DIR}/sql_yacc.cc
+    ${CMAKE_CURRENT_BINARY_DIR}/sql_hints.yy.cc
+    COMPILE_FLAGS "-Wno-free-nonheap-object -Wno-unused-label")
 ENDIF()
 
 MY_CHECK_CXX_COMPILER_FLAG("-fno-builtin-memcmp" HAVE_NO_BUILTIN_MEMCMP)
@@ -447,11 +485,8 @@ SET(SQL_GUNIT_LIB_SOURCE
   sql_list.cc 
   ../sql-common/sql_string.cc
   thr_malloc.cc
+  locks/shared_spin_lock.cc
   )
-
-IF(WIN32)
-  LIST(APPEND SQL_GUNIT_LIB_SOURCE named_pipe.cc)
-ENDIF()
 
 ADD_CONVENIENCE_LIBRARY(sqlgunitlib ${SQL_GUNIT_LIB_SOURCE})
 ADD_DEPENDENCIES(sqlgunitlib GenError)
@@ -524,6 +559,29 @@ ENDIF()
 
 SET_TARGET_PROPERTIES(mysqld PROPERTIES ENABLE_EXPORTS TRUE) 
 TARGET_LINK_LIBRARIES(mysqld sql binlog rpl master slave sql mysys mysys_ssl binlogevents_static)
+
+# Plugins may need more symbols than the server does.
+IF(UNIX AND STATIC_SSL_LIBRARY)
+  IF(APPLE)
+    TARGET_LINK_LIBRARIES(mysqld
+      -Wl,-force_load ${CRYPTO_LIBRARY}
+      -Wl,-force_load ${OPENSSL_LIBRARY}
+      )
+  ELSE()
+    # OpenSSL 3.0.8 has an issue with duplicate symbols between static crypto
+    # and ssl libraries. See https://github.com/openssl/openssl/issues/20238
+    IF("${OPENSSL_VERSION}" VERSION_EQUAL "3.0.8")
+      TARGET_LINK_LIBRARIES(mysqld
+        -Wl,--whole-archive,--allow-multiple-definition ${SSL_LIBRARIES}
+        -Wl,--no-whole-archive
+        )
+    ELSE()
+      TARGET_LINK_LIBRARIES(mysqld
+        -Wl,--whole-archive ${SSL_LIBRARIES} -Wl,--no-whole-archive
+        )
+    ENDIF()
+  ENDIF()
+ENDIF()
 
 # Provide plugins with minimal set of libraries
 SET(INTERFACE_LIBS ${LIBRT})
@@ -622,21 +680,13 @@ ADD_CUSTOM_TARGET(
 )
 
 
-IF(WIN32 OR HAVE_DLOPEN AND NOT DISABLE_SHARED)
-  ADD_LIBRARY(udf_example MODULE udf_example.cc)
-  SET_TARGET_PROPERTIES(udf_example PROPERTIES PREFIX "")
-  # udf_example depends on strings 
+MYSQL_ADD_PLUGIN(udf_example udf_example.cc
+                 MODULE_ONLY TEST_ONLY MODULE_OUTPUT_NAME "udf_example")
+IF(NOT DISABLE_SHARED)
   IF(WIN32)
-    IF(MSVC)
-     SET_TARGET_PROPERTIES(udf_example
-       PROPERTIES LINK_FLAGS "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/udf_example.def")
-    ENDIF()
-    TARGET_LINK_LIBRARIES(udf_example strings)
-  ELSE()
-    # udf_example is using safemutex exported by mysqld
-    TARGET_LINK_LIBRARIES(udf_example mysqld)
     SET_TARGET_PROPERTIES(udf_example
-      PROPERTIES LINK_FLAGS "${CMAKE_SHARED_LIBRARY_C_FLAGS}")
+      PROPERTIES LINK_FLAGS
+      "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/udf_example.def")
   ENDIF()
 ENDIF()
 
@@ -653,11 +703,10 @@ IF(NOT DISABLE_SHARED)
   ENDIF()
 ENDIF()
 
-FOREACH(tool glibtoolize libtoolize aclocal autoconf autoheader automake gtar 
- tar git)
- STRING(TOUPPER ${tool}  TOOL)
- FIND_PROGRAM(${TOOL}_EXECUTABLE ${tool} DOC "path to the executable")
- MARK_AS_ADVANCED(${TOOL}_EXECUTABLE)
+FOREACH(tool gtar tar git)
+  STRING(TOUPPER ${tool}  TOOL)
+  FIND_PROGRAM(${TOOL}_EXECUTABLE ${tool} DOC "path to the executable")
+  MARK_AS_ADVANCED(${TOOL}_EXECUTABLE)
 ENDFOREACH()
 
 CONFIGURE_FILE(

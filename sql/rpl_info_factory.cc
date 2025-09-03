@@ -1,13 +1,20 @@
-/* Copyright (c) 2010, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2010, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -144,7 +151,7 @@ bool Rpl_info_factory::change_mi_repository(Master_info *mi,
   uint instances= 1;
   DBUG_ENTER("Rpl_info_factory::change_mi_repository");
 
-  DBUG_ASSERT(handler_src);
+  assert(handler_src);
 
   if (init_repositories(mi_table_data, mi_file_data, mi_option, instances,
                         NULL, &handler_dest, msg))
@@ -316,7 +323,7 @@ bool Rpl_info_factory::change_rli_repository(Relay_log_info *rli,
   uint instances= 1;
   DBUG_ENTER("Rpl_info_factory::change_rli_repository");
 
-  DBUG_ASSERT(handler_src != NULL);
+  assert(handler_src != NULL);
 
   if (init_repositories(rli_table_data, rli_file_data, rli_option,
                         instances, NULL, &handler_dest, msg))
@@ -442,8 +449,8 @@ Slave_worker *Rpl_info_factory::create_worker(uint rli_option, uint worker_id,
 
   /* get_num_instances() requires channel_map lock */
   /*
-  DBUG_ASSERT(channel_map.get_num_instances() <= 1 ||
-              (rli_option == 1 && handler_dest->get_rpl_info_type() == 1));
+    assert(channel_map.get_num_instances() <= 1 ||
+    (rli_option == 1 && handler_dest->get_rpl_info_type() == 1));
   */
   if (decide_repository(worker, rli_option, &handler_src, &handler_dest, &msg))
     goto err;
@@ -492,7 +499,7 @@ static void build_worker_info_name(char* to,
                                    const char* path,
                                    const char* fname)
 {
-  DBUG_ASSERT(to);
+  assert(to);
   char* pos= to;
   if (path[0])
     pos= my_stpcpy(pos, path);
@@ -598,8 +605,8 @@ bool Rpl_info_factory::decide_repository(Rpl_info *info, uint option,
     goto err;
   }
 
-  DBUG_ASSERT((*handler_src) != NULL && (*handler_dest) != NULL &&
-              (*handler_src) != (*handler_dest));
+  assert((*handler_src) != NULL && (*handler_dest) != NULL &&
+         (*handler_src) != (*handler_dest));
 
   return_check_src= check_src_repository(info, option, handler_src);
   return_check_dst= (*handler_dest)->do_check_info(info->get_internal_id()); // approx via scan, not field_values! Todo: reconsider any need for that at least in the Worker case
@@ -666,7 +673,7 @@ bool Rpl_info_factory::decide_repository(Rpl_info *info, uint option,
     else if (return_check_src == REPOSITORY_DOES_NOT_EXIST &&
              return_check_dst == REPOSITORY_EXISTS)
     {
-      DBUG_ASSERT(info->get_rpl_info_handler() == NULL);
+      assert(info->get_rpl_info_handler() == NULL);
       if ((*handler_dest)->do_init_info(info->get_internal_id()))
       {
         *msg= "Error reading repository";
@@ -675,8 +682,9 @@ bool Rpl_info_factory::decide_repository(Rpl_info *info, uint option,
     }
     else
     {
-      DBUG_ASSERT(return_check_src == REPOSITORY_DOES_NOT_EXIST &&
-                  return_check_dst == REPOSITORY_DOES_NOT_EXIST);
+      assert(return_check_src == REPOSITORY_DOES_NOT_EXIST &&
+             return_check_dst == REPOSITORY_DOES_NOT_EXIST);
+      info->inited= false;
     }
 
     delete (*handler_src);
@@ -873,7 +881,7 @@ bool Rpl_info_factory::init_repositories(const struct_table_data table_data,
 
   DBUG_ENTER("Rpl_info_factory::init_mi_repositories");
 
-  DBUG_ASSERT(handler_dest != NULL);
+  assert(handler_dest != NULL);
   switch (rep_option)
   {
     case INFO_REPOSITORY_FILE:
@@ -912,7 +920,7 @@ bool Rpl_info_factory::init_repositories(const struct_table_data table_data,
     break;
 
     default:
-      DBUG_ASSERT(0);
+      assert(0);
   }
   error= FALSE;
 
@@ -929,7 +937,7 @@ bool Rpl_info_factory::scan_repositories(uint* found_instances,
   bool error= false;
   uint file_instances= 0;
   uint table_instances= 0;
-  DBUG_ASSERT(found_rep_option != NULL);
+  assert(found_rep_option != NULL);
 
   DBUG_ENTER("Rpl_info_factory::scan_repositories");
 
@@ -1292,7 +1300,7 @@ Rpl_info_factory::load_channel_names_from_repository(std::vector<std::string>& c
   switch(mi_repository)
   {
   case INFO_REPOSITORY_FILE:
-    DBUG_ASSERT(mi_instances == 1);
+    assert(mi_instances == 1);
     /* insert default channel */
     {
     std::string str(default_channel);
@@ -1309,7 +1317,7 @@ Rpl_info_factory::load_channel_names_from_repository(std::vector<std::string>& c
     /* file and table instanaces are zero, nothing to be done*/
     break;
   default:
-    DBUG_ASSERT(0);
+    assert(0);
   }
 
   DBUG_RETURN(false);
@@ -1367,6 +1375,8 @@ Rpl_info_factory::load_channel_names_from_table(std::vector<std::string> &channe
 
   thd= info->access->create_thd();
   saved_mode= thd->variables.sql_mode;
+  // Ensure channel names are always read consistently
+  thd->variables.sql_mode &= ~MODE_PAD_CHAR_TO_FULL_LENGTH;
 
   /*
      Opens and locks the rpl_info table before accessing it.

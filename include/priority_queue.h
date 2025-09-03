@@ -1,13 +1,20 @@
-/* Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2014, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -98,7 +105,7 @@ private:
   // Returns the index of the parent node of node i.
   static size_type parent(size_type i)
   {
-    DBUG_ASSERT(i != 0);
+    assert(i != 0);
     return (--i) >> 1; // (i - 1) / 2
   }
 
@@ -116,7 +123,7 @@ private:
 
   void heapify(size_type i, size_type last)
   {
-    DBUG_ASSERT(i < size());
+    assert(i < size());
     size_type largest = i;
 
     do
@@ -149,7 +156,7 @@ private:
 
   void reverse_heapify(size_type i)
   {
-    DBUG_ASSERT(i < size());
+    assert(i < size());
     while (i > 0 && !Base::operator()(m_container[i], m_container[parent(i)]))
     {
       std::swap(m_container[parent(i)], m_container[i]);
@@ -216,14 +223,14 @@ public:
   /// Returns a const reference to the top element of the priority queue.
   value_type const &top() const
   {
-    DBUG_ASSERT(!empty());
+    assert(!empty());
     return m_container[0];
   }
 
   /// Returns a reference to the top element of the priority queue.
   value_type& top()
   {
-    DBUG_ASSERT(!empty());
+    assert(!empty());
     return m_container[0];
   }
 
@@ -257,7 +264,7 @@ public:
   /// Removes the element at position i from the priority queue.
   void remove(size_type i)
   {
-    DBUG_ASSERT(i < size());
+    assert(i < size());
 
     if (i == m_container.size() - 1)
     {
@@ -267,7 +274,7 @@ public:
 
     m_container[i] = m_container[m_container.size() - 1];
     m_container.pop_back();
-    heapify(i);
+    update(i);
   }
 
   /**
@@ -276,8 +283,8 @@ public:
   */
   void decrease(size_type i, value_type const &x)
   {
-    DBUG_ASSERT(i < size());
-    DBUG_ASSERT(!Base::operator()(m_container[i], x));
+    assert(i < size());
+    assert(!Base::operator()(m_container[i], x));
     decrease_key(i, x);
   }
 
@@ -287,8 +294,8 @@ public:
   */
   void increase(size_type i, value_type const &x)
   {
-    DBUG_ASSERT(i < size());
-    DBUG_ASSERT(!Base::operator()(x, m_container[i]));
+    assert(i < size());
+    assert(!Base::operator()(x, m_container[i]));
     increase_key(i, x);
   }
 
@@ -298,7 +305,7 @@ public:
   */
   void update(size_type i, value_type const &x)
   {
-    DBUG_ASSERT(i < size());
+    assert(i < size());
     if (Base::operator()(x, m_container[i]))
     {
       decrease_key(i, x);
@@ -333,7 +340,7 @@ public:
   */
   void update(size_type i)
   {
-    DBUG_ASSERT(i < size());
+    assert(i < size());
     if (i == 0 || Base::operator()(m_container[i], m_container[parent(i)]))
     {
       heapify(i);
@@ -350,7 +357,7 @@ public:
   */
   void update_top()
   {
-    DBUG_ASSERT(!empty());
+    assert(!empty());
     heapify(0);
   }
 
@@ -363,14 +370,14 @@ public:
   /// Returns a const reference to the i-th element in the underlying container.
   value_type const& operator[](size_type i) const
   {
-    DBUG_ASSERT(i < size());
+    assert(i < size());
     return m_container[i];
   }
 
   /// Returns a reference to the i-th element in the underlying container.
   value_type& operator[](size_type i)
   {
-    DBUG_ASSERT(i < size());
+    assert(i < size());
     return m_container[i];
   }
 
@@ -465,7 +472,7 @@ public:
   MY_ATTRIBUTE((warn_unused_result))
   bool reserve(size_type n)
   {
-    DBUG_ASSERT(n <= m_container.max_size());
+    assert(n <= m_container.max_size());
     try
     {
       m_container.reserve(n);

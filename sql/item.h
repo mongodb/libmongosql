@@ -1,16 +1,23 @@
 #ifndef ITEM_INCLUDED
 #define ITEM_INCLUDED
 
-/* Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -289,7 +296,7 @@ public:
   */
   bool eq(const char *str) const
   {
-    DBUG_ASSERT(str && ptr());
+    assert(str && ptr());
     return my_strcasecmp(system_charset_info, ptr(), str) == 0;
   }
   bool eq_safe(const char *str) const
@@ -945,8 +952,8 @@ private:
     Note: contextualize_() is an intermediate function. Remove it together
     with Parse_tree_node::contextualize_().
   */
-  virtual bool contextualize(Parse_context *pc) { DBUG_ASSERT(0); return true; }
-  virtual bool contextualize_(Parse_context *pc) { DBUG_ASSERT(0); return true; }
+  virtual bool contextualize(Parse_context *pc) { assert(0); return true; }
+  virtual bool contextualize_(Parse_context *pc) { assert(0); return true; }
 
 protected:
   /**
@@ -1129,7 +1136,7 @@ public:
           smallest possible value of LLONG_MIN 
   */
   virtual longlong val_int_endpoint(bool left_endp, bool *incl_endp)
-  { DBUG_ASSERT(0); return 0; }
+  { assert(0); return 0; }
 
 
   /* valXXX methods must return NULL or 0 or 0.0 if null_value is set. */
@@ -1171,7 +1178,7 @@ public:
   {
     if (field_type() == MYSQL_TYPE_TIME)
       return val_time_temporal();
-    DBUG_ASSERT(is_temporal_with_date());
+    assert(is_temporal_with_date());
     return val_date_temporal();
   }
   /**
@@ -1368,7 +1375,7 @@ public:
                                      double rows_in_table)
   {
     // Filtering effect cannot be calculated for a table already read.
-    DBUG_ASSERT((read_tables & filter_for_table) == 0);
+    assert((read_tables & filter_for_table) == 0);
     return COND_FILTER_ALLPASS;
   }
 
@@ -1656,8 +1663,15 @@ public:
     Returns true if this is constant but its value may be not known yet.
     (Can be used for parameters of prep. stmts or of stored procedures.)
   */
-  virtual bool const_during_execution() const 
+  virtual bool const_during_execution() const
   { return (used_tables() & ~PARAM_TABLE_BIT) == 0; }
+
+  /**
+    @returns true if this item is non-deterministic, which means that a
+             has a component that must be evaluated once per row in
+             execution of a JOIN query.
+  */
+  bool is_non_deterministic() const { return used_tables() & RAND_TABLE_BIT; }
 
   /**
     This method is used for to:
@@ -2167,18 +2181,24 @@ public:
             compared as DATETIME values by the Arg_comparator.
       FALSE otherwise.
   */
-  inline bool has_compatible_context(Item *item) const
-  {
-    /* Same context. */
-    if (cmp_context == (Item_result)-1 || item->cmp_context == cmp_context)
+  inline bool has_compatible_context(Item *item) const {
+    // If no explicit context has been set, assume the same type as the item
+    const Item_result this_context =
+        cmp_context == (Item_result)-1 ? result_type() : cmp_context;
+    const Item_result other_context = item->cmp_context == (Item_result)-1
+                                          ? item->result_type()
+                                          : item->cmp_context;
+
+    // Check if both items have the same context
+    if (this_context == other_context) {
       return TRUE;
+    }
     /* DATETIME comparison context. */
     if (is_temporal_with_date())
-      return item->is_temporal_with_date() ||
-             item->cmp_context == STRING_RESULT;
+      return item->is_temporal_with_date() || other_context == STRING_RESULT;
     if (item->is_temporal_with_date())
-      return is_temporal_with_date() || cmp_context == STRING_RESULT;
-    return FALSE;
+      return is_temporal_with_date() || this_context == STRING_RESULT;
+    return false;
   }
   virtual Field::geometry_type get_geometry_type() const
     { return Field::GEOM_GEOMETRY; };
@@ -2246,7 +2266,7 @@ public:
   /*
     Return TRUE if the item points to a column of an outer-joined table.
   */
-  virtual bool is_outer_field() const { DBUG_ASSERT(fixed); return FALSE; }
+  virtual bool is_outer_field() const { assert(fixed); return FALSE; }
 
   /**
      Check if an item either is a blob field, or will be represented as a BLOB
@@ -2355,7 +2375,7 @@ public:
   Name_string m_name;
 
 public:
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   /*
     Routine to which this Item_splocal belongs. Used for checking if correct
     runtime context is used for variable handling.
@@ -2958,18 +2978,18 @@ public:
   virtual void print(String *str, enum_query_type query_type);
   bool is_outer_field() const
   {
-    DBUG_ASSERT(fixed);
+    assert(fixed);
     return table_ref->outer_join || table_ref->outer_join_nest();
   }
   Field::geometry_type get_geometry_type() const
   {
-    DBUG_ASSERT(field_type() == MYSQL_TYPE_GEOMETRY);
+    assert(field_type() == MYSQL_TYPE_GEOMETRY);
     return field->get_geometry_type();
   }
   const CHARSET_INFO *charset_for_protocol(void) const
   { return field->charset_for_protocol(); }
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   void dbug_print()
   {
     fprintf(DBUG_FILE, "<field ");
@@ -3035,6 +3055,61 @@ public:
   }
 
   bool repoint_const_outer_ref(uchar *arg);
+
+
+  /**
+    Checks if the current object represents an asterisk select list item
+
+    @returns false if a regular column reference, true if an asterisk
+             select list item.
+  */
+  virtual bool is_asterisk() const { return false; }
+};
+
+/**
+  Represents [schema.][table.]* in a select list
+
+  Item_asterisk is used to insert placeholder objects for the special
+  select list item * (asterisk) into AST.
+  Those placeholder objects are to be substituted later with e.g. a list of real
+  table columns by a resolver (@see setup_wild).
+
+  @todo The parent class Item_field is redundant. Refactor setup_wild() to
+        replace Item_field with a simpler one.
+*/
+class Item_asterisk : public Item_field
+{
+  typedef Item_field super;
+
+public:
+  /**
+    Constructor
+
+    @param context_arg          Name resolution context.
+    @param opt_schema_name      Schema name or NULL.
+    @param opt_table_name       Table name or NULL.
+  */
+
+  Item_asterisk(Name_resolution_context *context_arg,
+                const char *opt_schema_name, const char *opt_table_name);
+
+  /**
+    Constructor
+
+    @param pos                  Location of the * (asterisk) lexeme.
+    @param opt_schema_name      Schema name or NULL.
+    @param opt_table_name       Table name or NULL.
+  */
+  Item_asterisk(const POS &pos, const char *opt_schema_name,
+                const char *opt_table_name)
+      : super(pos, opt_schema_name, opt_table_name, "*") {}
+
+  virtual bool itemize(Parse_context *pc, Item **res);
+  virtual bool fix_fields(THD *, Item **) {
+    assert(false);  // should never happen: see setup_wild()
+    return true;
+  }
+  virtual bool is_asterisk() const { return true; }
 };
 
 class Item_null :public Item_basic_constant
@@ -3256,7 +3331,7 @@ public:
   { return state != NO_VALUE ? (table_map)0 : PARAM_TABLE_BIT; }
   virtual void print(String *str, enum_query_type query_type);
   bool is_null()
-  { DBUG_ASSERT(state != NO_VALUE); return state == NULL_VALUE; }
+  { assert(state != NO_VALUE); return state == NULL_VALUE; }
   bool basic_const_item() const;
   /*
     This method is used to make a copy of a basic constant item when
@@ -3356,8 +3431,8 @@ public:
   enum Type type() const { return INT_ITEM; }
   enum Item_result result_type () const { return INT_RESULT; }
   enum_field_types field_type() const { return MYSQL_TYPE_LONGLONG; }
-  longlong val_int() { DBUG_ASSERT(fixed == 1); return value; }
-  double val_real() { DBUG_ASSERT(fixed == 1); return (double) value; }
+  longlong val_int() { assert(fixed == 1); return value; }
+  double val_real() { assert(fixed == 1); return (double) value; }
   my_decimal *val_decimal(my_decimal *);
   String *val_str(String*);
   bool get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate)
@@ -3413,13 +3488,13 @@ public:
   Item_temporal(enum_field_types field_type_arg, longlong i): Item_int(i),
     cached_field_type(field_type_arg)
   {
-    DBUG_ASSERT(is_temporal_type(field_type_arg));
+    assert(is_temporal_type(field_type_arg));
   }
   Item_temporal(enum_field_types field_type_arg, const Name_string &name_arg,
                 longlong i, uint length): Item_int(i),
     cached_field_type(field_type_arg)
   {
-    DBUG_ASSERT(is_temporal_type(field_type_arg));
+    assert(is_temporal_type(field_type_arg));
     max_length= length;
     item_name= name_arg;
     fixed= 1;
@@ -3429,12 +3504,12 @@ public:
   longlong val_date_temporal() { return val_int(); }
   bool get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate)
   {
-    DBUG_ASSERT(0);
+    assert(0);
     return false;
   }
   bool get_time(MYSQL_TIME *ltime)
   {
-    DBUG_ASSERT(0);
+    assert(0);
     return false;
   }
   enum_field_types field_type() const
@@ -3458,7 +3533,7 @@ public:
   Item_uint(const Name_string &name_arg, longlong i, uint length)
     :Item_int(name_arg, i, length) { unsigned_flag= 1; }
   double val_real()
-    { DBUG_ASSERT(fixed == 1); return ulonglong2double((ulonglong)value); }
+  { assert(fixed == 1); return ulonglong2double((ulonglong)value); }
   String *val_str(String*);
 
   Item *clone_item() { return new Item_uint(item_name, value, max_length); }
@@ -3568,10 +3643,10 @@ protected:
 public:
   enum Type type() const { return REAL_ITEM; }
   enum_field_types field_type() const { return MYSQL_TYPE_DOUBLE; }
-  double val_real() { DBUG_ASSERT(fixed == 1); return value; }
+  double val_real() { assert(fixed == 1); return value; }
   longlong val_int()
   {
-    DBUG_ASSERT(fixed == 1);
+    assert(fixed == 1);
     if (value <= (double) LLONG_MIN)
     {
        return LLONG_MIN;
@@ -3743,7 +3818,7 @@ public:
   longlong val_int();
   String *val_str(String*)
   {
-    DBUG_ASSERT(fixed == 1);
+    assert(fixed == 1);
     return &str_value;
   }
   my_decimal *val_decimal(my_decimal *);
@@ -3932,7 +4007,7 @@ public:
   enum Type type() const { return VARBIN_ITEM; }
   double val_real()
   { 
-    DBUG_ASSERT(fixed == 1); 
+    assert(fixed == 1); 
     return (double) (ulonglong) Item_hex_string::val_int();
   }
   longlong val_int();
@@ -3941,7 +4016,7 @@ public:
   {
     return new Item_hex_string(str_value.ptr(), max_length);
   }
-  String *val_str(String*) { DBUG_ASSERT(fixed == 1); return &str_value; }
+  String *val_str(String*) { assert(fixed == 1); return &str_value; }
   my_decimal *val_decimal(my_decimal *);
   bool get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate)
   {
@@ -4203,14 +4278,14 @@ public:
   }
   bool get_time(MYSQL_TIME *ltime)
   {
-    DBUG_ASSERT(fixed);
+    assert(fixed);
     return (*ref)->get_time(ltime);
   }
   virtual bool basic_const_item() const { return ref && (*ref)->basic_const_item(); }
   bool is_outer_field() const
   {
-    DBUG_ASSERT(fixed);
-    DBUG_ASSERT(ref);
+    assert(fixed);
+    assert(ref);
     return (*ref)->is_outer_field();
   }
 
@@ -4219,7 +4294,7 @@ public:
   */
   virtual bool has_subquery() const 
   { 
-    DBUG_ASSERT(ref);
+    assert(ref);
     return (*ref)->has_subquery();
   }
 
@@ -4228,7 +4303,7 @@ public:
   */
   virtual bool has_stored_program() const 
   { 
-    DBUG_ASSERT(ref);
+    assert(ref);
     return (*ref)->has_stored_program();
   }
 
@@ -4544,12 +4619,12 @@ public:
   void print(String *str, enum_query_type query_type);
   bool get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate)
   {
-    DBUG_ASSERT(0);
+    assert(0);
     return true;
   }
   bool get_time(MYSQL_TIME *ltime)
   {
-    DBUG_ASSERT(0);
+    assert(0);
     return true;
   }
 
@@ -4581,7 +4656,7 @@ public:
   longlong val_date_temporal() { return val_int(); }
   longlong val_time_temporal()
   {
-    DBUG_ASSERT(0);
+    assert(0);
     return val_int();
   }
 };
@@ -4610,7 +4685,7 @@ public:
   longlong val_time_temporal() { return val_int(); }
   longlong val_date_temporal()
   {
-    DBUG_ASSERT(0);
+    assert(0);
     return val_int();
   }
 };
@@ -4955,7 +5030,7 @@ class Cached_item_field :public Cached_item
   uint length;
 
 public:
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   void dbug_print()
   {
     uchar *org_ptr;
@@ -5278,7 +5353,7 @@ public:
   */
   void store_null()
   {
-    DBUG_ASSERT(maybe_null);
+    assert(maybe_null);
     value_cached= true;
     null_value= true;
   }
@@ -5585,12 +5660,12 @@ public:
   String *val_str(String*);
   bool get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate)
   {
-    DBUG_ASSERT(0);
+    assert(0);
     return true;
   }
   bool get_time(MYSQL_TIME *ltime)
   {
-    DBUG_ASSERT(0);
+    assert(0);
     return true;
   }
   bool join_types(THD *thd, Item *);
@@ -5623,7 +5698,7 @@ extern int stored_field_cmp_to_item(THD *thd, Field *field, Item *item);
 extern const String my_null_string;
 void convert_and_print(String *from_str, String *to_str,
                        const CHARSET_INFO *to_cs);
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 bool is_fixed_or_outer_ref(const Item *ref);
 #endif
 

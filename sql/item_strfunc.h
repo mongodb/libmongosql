@@ -1,16 +1,23 @@
 #ifndef ITEM_STRFUNC_INCLUDED
 #define ITEM_STRFUNC_INCLUDED
 
-/* Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -57,7 +64,9 @@ public:
   Item_str_func(const POS &pos, Item *a, Item *b, Item *c, Item *d, Item* e)
     :Item_func(pos, a, b, c, d, e)
   {decimals=NOT_FIXED_DEC; }
-
+  Item_str_func(const POS &pos, Item *a, Item *b, Item *c, Item *d, Item* e, Item* f)
+    :Item_func(pos, a, b, c, d, e, f)
+  {decimals=NOT_FIXED_DEC; }
   Item_str_func(List<Item> &list) :Item_func(list) {decimals=NOT_FIXED_DEC; }
   Item_str_func(const POS &pos, PT_item_list *opt_list)
     :Item_func(pos, opt_list)
@@ -178,7 +187,15 @@ public:
   Item_func_aes_encrypt(const POS &pos, Item *a, Item *b, Item *c)
     :Item_str_func(pos, a, b, c)
   {}
-
+  Item_func_aes_encrypt(const POS &pos, Item *a, Item *b, Item *c, Item *d)
+    :Item_str_func(pos, a, b, c, d)
+  {}
+  Item_func_aes_encrypt(const POS &pos, Item *a, Item *b, Item *c, Item *d, Item *e)
+    :Item_str_func(pos, a, b, c, d, e)
+  {}
+  Item_func_aes_encrypt(const POS& pos, Item* a, Item* b, Item* c, Item* d, Item* e, Item* f)
+    :Item_str_func(pos, a, b, c, d, e, f)
+  {}
   virtual bool itemize(Parse_context *pc, Item **res);
   String *val_str(String *);
   void fix_length_and_dec();
@@ -195,7 +212,15 @@ public:
   Item_func_aes_decrypt(const POS &pos, Item *a, Item *b, Item *c)
     :Item_str_func(pos, a, b, c)
   {}
-
+  Item_func_aes_decrypt(const POS &pos, Item *a, Item *b, Item *c, Item *d)
+    :Item_str_func(pos, a, b, c, d)
+  {}
+  Item_func_aes_decrypt(const POS &pos, Item *a, Item *b, Item *c, Item *d, Item *e)
+    :Item_str_func(pos, a, b, c, d, e)
+  {}
+  Item_func_aes_decrypt(const POS& pos, Item* a, Item* b, Item* c, Item* d, Item* e, Item* f)
+    :Item_str_func(pos, a, b, c, d, e, f)
+  {}
   virtual bool itemize(Parse_context *pc, Item **res);
   String *val_str(String *);
   void fix_length_and_dec();
@@ -229,11 +254,11 @@ class Item_func_concat :public Item_str_func
   String tmp_value;
 public:
   Item_func_concat(const POS &pos, PT_item_list *opt_list)
-    :Item_str_func(pos, opt_list)
-  {}
-
-  Item_func_concat(Item *a,Item *b) :Item_str_func(a,b) {}
-  Item_func_concat(const POS &pos, Item *a,Item *b) :Item_str_func(pos, a,b) {}
+      : Item_str_func(pos, opt_list), tmp_value("", 0, collation.collation) {}
+  Item_func_concat(Item *a, Item *b)
+      : Item_str_func(a, b), tmp_value("", 0, collation.collation) {}
+  Item_func_concat(const POS &pos, Item *a, Item *b)
+      : Item_str_func(pos, a, b), tmp_value("", 0, collation.collation) {}
 
   String *val_str(String *);
   void fix_length_and_dec();
@@ -244,10 +269,11 @@ class Item_func_concat_ws :public Item_str_func
 {
   String tmp_value;
 public:
-  Item_func_concat_ws(List<Item> &list) :Item_str_func(list) {}
+  Item_func_concat_ws(List<Item> &list)
+      : Item_str_func(list), tmp_value("", 0, collation.collation) {}
   Item_func_concat_ws(const POS &pos, PT_item_list *opt_list)
-    :Item_str_func(pos, opt_list)
-  {}
+      : Item_str_func(pos, opt_list), tmp_value("", 0, collation.collation) {}
+
   String *val_str(String *);
   void fix_length_and_dec();
   const char *func_name() const { return "concat_ws"; }
@@ -662,7 +688,7 @@ public:
 
   String *val_str(String *)
   {
-    DBUG_ASSERT(fixed == 1);
+    assert(fixed == 1);
     return (null_value ? 0 : &str_value);
   }
   bool fix_fields(THD *thd, Item **ref);
@@ -810,7 +836,7 @@ public:
   String *val_str(String *str);
   bool fix_fields(THD *thd, Item **ref)
   {
-    DBUG_ASSERT(fixed == 0);
+    assert(fixed == 0);
     bool res= ((!item->fixed && item->fix_fields(thd, &item)) ||
                item->check_cols(1) ||
                Item_func::fix_fields(thd, ref));
@@ -975,7 +1001,7 @@ public:
 };
 
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 class Item_func_like_range :public Item_str_func
 {
 protected:
@@ -1045,7 +1071,7 @@ public:
   Item_func_binary(const POS &pos, Item *a) :Item_str_func(pos, a) {}
   String *val_str(String *a)
   {
-    DBUG_ASSERT(fixed == 1);
+    assert(fixed == 1);
     String *tmp=args[0]->val_str(a);
     null_value=args[0]->null_value;
     if (tmp)
@@ -1132,7 +1158,7 @@ public:
   Item_func_conv_charset(Item *a, const CHARSET_INFO *cs,
                          bool cache_if_const) :Item_str_func(a)
   {
-    DBUG_ASSERT(is_fixed_or_outer_ref(args[0]));
+    assert(is_fixed_or_outer_ref(args[0]));
 
     conv_charset= cs;
     if (cache_if_const && args[0]->const_item())
@@ -1317,6 +1343,10 @@ public:
   String *val_str(String *);
   bool check_gcol_func_processor(uchar *int_arg)
   { return true; }
+  // set RAND_TABLE_BIT in the used_tables_cache
+  table_map get_initial_pseudo_tables() const { return RAND_TABLE_BIT; }
+  // uuid is not constant and so non-cacheable
+  bool const_item() const { return (used_tables() == 0); }
 };
 
 class Item_func_gtid_subtract: public Item_str_ascii_func

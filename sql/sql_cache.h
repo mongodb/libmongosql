@@ -1,13 +1,20 @@
-/* Copyright (c) 2001, 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2001, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -250,7 +257,7 @@ extern "C" void query_cache_invalidate_by_MyISAM_filename(const char* filename);
 struct Query_cache_memory_bin
 {
   Query_cache_memory_bin() {}                 /* Remove gcc warning */
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   ulong size;
 #endif
   uint number;
@@ -258,7 +265,7 @@ struct Query_cache_memory_bin
 
   inline void init(ulong size_arg)
   {
-#ifndef DBUG_OFF
+#ifndef NDEBUG
     size = size_arg;
 #endif
     number = 0;
@@ -291,7 +298,7 @@ public:
 
 
 private:
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   my_thread_id m_cache_lock_thread_id;
 #endif
   mysql_cond_t COND_cache_status_changed;
@@ -498,7 +505,7 @@ protected:
 
   /*
     The following functions are only used when debugging
-    We don't protect these with ifndef DBUG_OFF to not have to recompile
+    We don't protect these with ifndef NDEBUG to not have to recompile
     everything if we want to add checks of the cache at some places.
   */
   void wreck(uint line, const char *message);

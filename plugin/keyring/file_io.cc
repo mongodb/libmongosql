@@ -1,13 +1,20 @@
-/* Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2016, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -31,7 +38,7 @@ my_bool is_super_user()
   MYSQL_SECURITY_CONTEXT sec_ctx;
   my_svc_bool has_super_privilege = FALSE;
 
-  DBUG_ASSERT(thd != NULL);
+  assert(thd != NULL);
 
   if (thd == NULL || thd_get_security_context(thd, &sec_ctx) ||
       security_context_get_option(sec_ctx, "privilege_super", &has_super_privilege))
@@ -191,7 +198,7 @@ my_bool File_io::truncate(File file, myf myFlags)
   if (ftruncate(file, (off_t) 0) && (myFlags & MY_WME))
   {
 #else
-  DBUG_ASSERT(0);
+    assert(0);
 #endif
     std::stringstream error_message;
     error_message << "Could not truncate file " << my_filename(file)
@@ -203,7 +210,7 @@ my_bool File_io::truncate(File file, myf myFlags)
     return TRUE;
   }
 //#else
-//  DBUG_ASSERT(0);
+//  assert(0);
 //#endif
   return FALSE;
 }

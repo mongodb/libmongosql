@@ -1,13 +1,20 @@
-/* Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
@@ -192,8 +199,22 @@ void udf_init()
     DBUG_PRINT("info",("init udf record"));
     LEX_STRING name;
     name.str=get_field(&mem, table->field[0]);
+
+    // Check the name.str is NULL or not.
+    if (name.str == NULL)
+    {
+      sql_print_error("Invalid row in mysql.func table for column 'name'");
+      continue;
+    }
+
     name.length = strlen(name.str);
     char *dl_name= get_field(&mem, table->field[2]);
+    if (dl_name == NULL)
+    {
+      sql_print_error("Invalid row in mysql.func table for function '%.64s'",
+                      name.str);
+      continue;
+    }
     bool new_dl=0;
     Item_udftype udftype=UDFTYPE_FUNCTION;
     if (table->s->fields >= 4)			// New func table
@@ -547,13 +568,13 @@ int mysql_create_function(THD *thd,udf_func *udf)
   if (write_bin_log(thd, true, thd->query().str, thd->query().length))
   {
     /* Restore the state of binlog format */
-    DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+    assert(!thd->is_current_stmt_binlog_format_row());
     if (save_binlog_row_based)
       thd->set_current_stmt_binlog_format_row();
     DBUG_RETURN(1);
   }
   /* Restore the state of binlog format */
-  DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+  assert(!thd->is_current_stmt_binlog_format_row());
   if (save_binlog_row_based)
     thd->set_current_stmt_binlog_format_row();
   DBUG_RETURN(0);
@@ -563,7 +584,7 @@ int mysql_create_function(THD *thd,udf_func *udf)
     dlclose(dl);
   mysql_rwlock_unlock(&THR_LOCK_udf);
   /* Restore the state of binlog format */
-  DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+  assert(!thd->is_current_stmt_binlog_format_row());
   if (save_binlog_row_based)
     thd->set_current_stmt_binlog_format_row();
   DBUG_RETURN(1);
@@ -640,7 +661,7 @@ int mysql_drop_function(THD *thd,const LEX_STRING *udf_name)
     error= 0;
 exit:
   /* Restore the state of binlog format */
-  DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+  assert(!thd->is_current_stmt_binlog_format_row());
   if (save_binlog_row_based)
     thd->set_current_stmt_binlog_format_row();
   DBUG_RETURN(error);

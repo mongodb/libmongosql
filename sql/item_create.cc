@@ -1,14 +1,21 @@
 /*
-   Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -247,7 +254,7 @@ public:
   virtual Item *create_native(THD *thd, LEX_STRING name,
                               PT_item_list *item_list)
   {
-    Item *func= NULL, *p1, *p2, *p3;
+    Item *func= NULL, *p1= NULL, *p2= NULL, *p3= NULL, *p4= NULL, *p5= NULL, *p6= NULL;
     int arg_count= 0;
 
     if (item_list != NULL)
@@ -270,6 +277,36 @@ public:
         func= create_aes(thd, p1, p2, p3);
         break;
       }
+    case 4:
+      {
+        p1= item_list->pop_front();
+        p2= item_list->pop_front();
+        p3= item_list->pop_front();
+        p4= item_list->pop_front();
+        func= create_aes(thd, p1, p2, p3, p4);
+        break;
+      }
+    case 5:
+      {
+        p1= item_list->pop_front();
+        p2= item_list->pop_front();
+        p3= item_list->pop_front();
+        p4= item_list->pop_front();
+        p5= item_list->pop_front();
+        func= create_aes(thd, p1, p2, p3, p4, p5);
+        break;
+      }
+    case 6:
+      {
+        p1= item_list->pop_front();
+        p2= item_list->pop_front();
+        p3= item_list->pop_front();
+        p4= item_list->pop_front();
+        p5= item_list->pop_front();
+        p6= item_list->pop_front();
+        func= create_aes(thd, p1, p2, p3, p4, p5, p6);
+        break;
+      }
     default:
       {
         my_error(ER_WRONG_PARAMCOUNT_TO_NATIVE_FCT, MYF(0), name.str);
@@ -281,6 +318,9 @@ public:
   }
   virtual Item *create_aes(THD *thd, Item *arg1, Item *arg2)= 0;
   virtual Item *create_aes(THD *thd, Item *arg1, Item *arg2, Item *arg3)= 0;
+  virtual Item *create_aes(THD *thd, Item *arg1, Item *arg2, Item *arg3, Item *arg4)= 0;
+  virtual Item *create_aes(THD *thd, Item *arg1, Item *arg2, Item *arg3, Item *arg4, Item *arg5)= 0;
+  virtual Item *create_aes(THD *thd, Item *arg1, Item *arg2, Item *arg3, Item *arg4, Item *arg5, Item *arg6)= 0;
 protected:
   Create_func_aes_base()
   {}
@@ -300,6 +340,18 @@ public:
   virtual Item *create_aes(THD *thd, Item *arg1, Item *arg2, Item *arg3)
   {
     return new (thd->mem_root) Item_func_aes_encrypt(POS(), arg1, arg2, arg3);
+  }
+  virtual Item *create_aes(THD *thd, Item *arg1, Item *arg2, Item *arg3, Item *arg4)
+  {
+    return new (thd->mem_root) Item_func_aes_encrypt(POS(), arg1, arg2, arg3, arg4);
+  }
+  virtual Item *create_aes(THD *thd, Item *arg1, Item *arg2, Item *arg3, Item *arg4, Item *arg5)
+  {
+    return new (thd->mem_root) Item_func_aes_encrypt(POS(), arg1, arg2, arg3, arg4, arg5);
+  }
+  virtual Item *create_aes(THD *thd, Item *arg1, Item *arg2, Item *arg3, Item *arg4, Item *arg5, Item *arg6)
+  {
+    return new (thd->mem_root) Item_func_aes_encrypt(POS(), arg1, arg2, arg3, arg4, arg5, arg6 );
   }
 
   static Create_func_aes_encrypt s_singleton;
@@ -321,7 +373,18 @@ public:
   {
     return new (thd->mem_root) Item_func_aes_decrypt(POS(), arg1, arg2, arg3);
   }
-
+  virtual Item *create_aes(THD *thd, Item *arg1, Item *arg2, Item *arg3, Item *arg4)
+  {
+    return new (thd->mem_root) Item_func_aes_decrypt(POS(), arg1, arg2, arg3, arg4);
+  }
+  virtual Item *create_aes(THD *thd, Item *arg1, Item *arg2, Item *arg3, Item *arg4, Item *arg5)
+  {
+    return new (thd->mem_root) Item_func_aes_decrypt(POS(), arg1, arg2, arg3, arg4, arg5);
+  }
+  virtual Item *create_aes(THD *thd, Item *arg1, Item *arg2, Item *arg3, Item *arg4, Item *arg5, Item *arg6)
+  {
+    return new (thd->mem_root) Item_func_aes_decrypt(POS(), arg1, arg2, arg3, arg4, arg5, arg6 );
+  }
   static Create_func_aes_decrypt s_singleton;
 
 protected:
@@ -2870,7 +2933,7 @@ protected:
 };
 
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 class Create_func_like_range_min : public Create_func_arg2
 {
 public:
@@ -4174,7 +4237,7 @@ Item*
 Create_udf_func::create_func(THD *thd, LEX_STRING name, PT_item_list *item_list)
 {
   udf_func *udf= find_udf(name.str, name.length);
-  DBUG_ASSERT(udf);
+  assert(udf);
   return create(thd, udf, item_list);
 }
 
@@ -4184,8 +4247,8 @@ Create_udf_func::create(THD *thd, udf_func *udf, PT_item_list *item_list)
 {
   DBUG_ENTER("Create_udf_func::create");
 
-  DBUG_ASSERT(   (udf->type == UDFTYPE_FUNCTION)
-              || (udf->type == UDFTYPE_AGGREGATE));
+  assert(   (udf->type == UDFTYPE_FUNCTION)
+            || (udf->type == UDFTYPE_AGGREGATE));
 
   Item *func= NULL;
   POS pos;
@@ -6367,7 +6430,7 @@ Create_func_length::create(THD *thd, Item *arg1)
 }
 
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
 Create_func_like_range_min Create_func_like_range_min::s_singleton;
 
 Item*
@@ -7619,7 +7682,7 @@ static Native_func_registry func_array[] =
   { { C_STRING_WITH_LEN("LCASE") }, BUILDER(Create_func_lower)},
   { { C_STRING_WITH_LEN("LEAST") }, BUILDER(Create_func_least)},
   { { C_STRING_WITH_LEN("LENGTH") }, BUILDER(Create_func_length)},
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   { { C_STRING_WITH_LEN("LIKE_RANGE_MIN") }, BUILDER(Create_func_like_range_min)},
   { { C_STRING_WITH_LEN("LIKE_RANGE_MAX") }, BUILDER(Create_func_like_range_max)},
 #endif
@@ -7866,7 +7929,7 @@ int item_create_init()
       DBUG_RETURN(1);
   }
 
-#ifndef DBUG_OFF
+#ifndef NDEBUG
   for (uint i=0 ; i < native_functions_hash.records ; i++)
   {
     func= (Native_func_registry*) my_hash_element(& native_functions_hash, i);
@@ -8061,7 +8124,7 @@ create_func_cast(THD *thd, const POS &pos, Item *a, const Cast_type *type)
   }
   default:
   {
-    DBUG_ASSERT(0);
+    assert(0);
     res= 0;
     break;
   }
@@ -8118,7 +8181,7 @@ Item *create_temporal_literal(THD *thd,
                                                   status.fractional_digits);
     break;
   default:
-    DBUG_ASSERT(0);
+    assert(0);
   }
 
   if (item)

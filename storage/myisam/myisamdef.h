@@ -1,14 +1,21 @@
 /*
-   Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2000, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -324,10 +331,9 @@ typedef struct st_buffpek {
 
 typedef struct st_mi_sort_param
 {
-  my_thread_handle thr;
   IO_CACHE read_cache, tempfile, tempfile_for_exceptions;
   DYNAMIC_ARRAY buffpek;
-  MI_BIT_BUFF   bit_buff;               /* For parallel repair of packrec. */
+  MI_BIT_BUFF   bit_buff;               /* For sort repair of packrec. */
 
   /*
     The next two are used to collect statistics, see update_key_parts for
@@ -786,8 +792,6 @@ void mi_check_print_warning(MI_CHECK *param, const char *fmt,...);
 void mi_check_print_info(MI_CHECK *param, const char *fmt,...);
 int flush_pending_blocks(MI_SORT_PARAM *param);
 int sort_ft_buf_flush(MI_SORT_PARAM *sort_param);
-int thr_write_keys(MI_SORT_PARAM *sort_param);
-void *thr_find_all_keys(void *arg);
 int flush_blocks(MI_CHECK *param, KEY_CACHE *key_cache, File file);
 
 int sort_write_record(MI_SORT_PARAM *sort_param);
@@ -803,8 +807,7 @@ extern thread_local_key_t keycache_tls_key;
 
 #ifdef HAVE_PSI_INTERFACE
 C_MODE_START
-extern PSI_mutex_key mi_key_mutex_MYISAM_SHARE_intern_lock,
-  mi_key_mutex_MI_SORT_INFO_mutex, mi_key_mutex_MI_CHECK_print_msg;
+extern PSI_mutex_key mi_key_mutex_MYISAM_SHARE_intern_lock;
 
 extern PSI_rwlock_key mi_key_rwlock_MYISAM_SHARE_key_root_lock,
   mi_key_rwlock_MYISAM_SHARE_mmap_lock;

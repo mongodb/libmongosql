@@ -1,13 +1,20 @@
-/* Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2015, 2023, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -117,7 +124,7 @@ merge_components(my_bool *pnull_value)
   if (is_comp_no_overlapped())
     return;
 
-  POS pos;
+  POS pos = {{NULL, NULL}, {NULL, NULL}};
   Item_func_spatial_operation ifso(pos, NULL, NULL,
                                    Item_func_spatial_operation::op_union);
   bool do_again= true;
@@ -229,7 +236,7 @@ bool linear_areal_intersect_infinite(Geometry *g1, Geometry *g2,
       res= bg::is_valid(mplgn);
     }
     else
-      DBUG_ASSERT(false);
+      assert(false);
 
     return res;
   }
@@ -388,7 +395,7 @@ bool BG_geometry_collection::merge_one_run(Item_func_spatial_operation *ifso,
       min corner point have greater coordinates than the max corner point,
       the box isn't valid and the rtree can be empty.
      */
-    DBUG_ASSERT(rtree_result.size() != 0);
+    assert(rtree_result.size() != 0);
 
     // Sort rtree_result by Rtree_entry::second in order to make
     // components in fixed order.
@@ -576,7 +583,7 @@ template <typename BG_geotype>
 bool post_fix_result(BG_result_buf_mgr *resbuf_mgr,
                      BG_geotype &geout, String *res)
 {
-  DBUG_ASSERT(geout.has_geom_header_space());
+  assert(geout.has_geom_header_space());
   reassemble_geometry(&geout);
 
   // Such objects returned by BG never have overlapped components.

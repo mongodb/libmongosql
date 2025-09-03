@@ -1,13 +1,20 @@
-/* Copyright (c) 2008, 2017, Oracle and/or its affiliates. All rights reserved.
+/* Copyright (c) 2008, 2023, Oracle and/or its affiliates.
 
   This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; version 2 of the License.
+  it under the terms of the GNU General Public License, version 2.0,
+  as published by the Free Software Foundation.
+
+  This program is also distributed with certain software (including
+  but not limited to OpenSSL) that is licensed under separate terms,
+  as designated in a particular file or component or in included license
+  documentation.  The authors of MySQL hereby grant you an additional
+  permission to link the program and your derivative works with the
+  separately licensed software that they have included with MySQL.
 
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  GNU General Public License, version 2.0, for more details.
 
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software Foundation,
@@ -73,6 +80,11 @@ TABLE_FIELD_DEF
 table_setup_timers::m_field_def=
 { 2, field_types };
 
+PFS_engine_table_share_state
+table_setup_timers::m_share_state = {
+  false /* m_checked */
+};
+
 PFS_engine_table_share
 table_setup_timers::m_share=
 {
@@ -85,8 +97,9 @@ table_setup_timers::m_share=
   sizeof(PFS_simple_index),
   &m_table_lock,
   &m_field_def,
-  false, /* checked */
-  false  /* perpetual */
+  false, /* m_perpetual */
+  false, /* m_optional */
+  &m_share_state
 };
 
 PFS_engine_table* table_setup_timers::create(void)
@@ -142,7 +155,7 @@ int table_setup_timers::rnd_next(void)
 int table_setup_timers::rnd_pos(const void *pos)
 {
   set_position(pos);
-  DBUG_ASSERT(m_pos.m_index < COUNT_SETUP_TIMERS);
+  assert(m_pos.m_index < COUNT_SETUP_TIMERS);
   m_row= &all_setup_timers_data[m_pos.m_index];
   return 0;
 }
@@ -154,10 +167,10 @@ int table_setup_timers::read_row_values(TABLE *table,
 {
   Field *f;
 
-  DBUG_ASSERT(m_row);
+  assert(m_row);
 
   /* Set the null bits */
-  DBUG_ASSERT(table->s->null_bytes == 0);
+  assert(table->s->null_bytes == 0);
 
   for (; (f= *fields) ; fields++)
   {
@@ -172,7 +185,7 @@ int table_setup_timers::read_row_values(TABLE *table,
         set_field_enum(f, *(m_row->m_timer_name_ptr));
         break;
       default:
-        DBUG_ASSERT(false);
+        assert(false);
       }
     }
   }
@@ -188,7 +201,7 @@ int table_setup_timers::update_row_values(TABLE *table,
   Field *f;
   longlong value;
 
-  DBUG_ASSERT(m_row);
+  assert(m_row);
 
   for (; (f= *fields) ; fields++)
   {
@@ -206,7 +219,7 @@ int table_setup_timers::update_row_values(TABLE *table,
           return HA_ERR_WRONG_COMMAND;
         break;
       default:
-        DBUG_ASSERT(false);
+        assert(false);
       }
     }
   }

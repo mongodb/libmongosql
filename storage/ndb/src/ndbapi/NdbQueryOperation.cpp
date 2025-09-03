@@ -1,14 +1,21 @@
 /*
-   Copyright (c) 2011, 2015, Oracle and/or its affiliates. All rights reserved.
+   Copyright (c) 2011, 2021, Oracle and/or its affiliates.
 
    This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; version 2 of the License.
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
+   GNU General Public License, version 2.0, for more details.
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
@@ -1652,7 +1659,7 @@ NdbQueryParamValue::serializeValue(const class NdbColumnImpl& column,
         return QRY_PARAMETER_HAS_WRONG_TYPE;
       
       len = static_cast<Uint32>(sizeof(m_value.uint16));
-      DBUG_ASSERT(len == maxSize);
+      assert(len == maxSize);
       dst.appendBytes(&m_value.uint16, len);
       break;
 
@@ -1662,7 +1669,7 @@ NdbQueryParamValue::serializeValue(const class NdbColumnImpl& column,
         return QRY_PARAMETER_HAS_WRONG_TYPE;
 
       len = static_cast<Uint32>(sizeof(m_value.uint32));
-      DBUG_ASSERT(len == maxSize);
+      assert(len == maxSize);
       dst.appendBytes(&m_value.uint32, len);
       break;
 
@@ -1672,7 +1679,7 @@ NdbQueryParamValue::serializeValue(const class NdbColumnImpl& column,
         return QRY_PARAMETER_HAS_WRONG_TYPE;
 
       len = static_cast<Uint32>(sizeof(m_value.uint64));
-      DBUG_ASSERT(len == maxSize);
+      assert(len == maxSize);
       dst.appendBytes(&m_value.uint64, len);
       break;
 
@@ -1681,7 +1688,7 @@ NdbQueryParamValue::serializeValue(const class NdbColumnImpl& column,
         return QRY_PARAMETER_HAS_WRONG_TYPE;
 
       len = static_cast<Uint32>(sizeof(m_value.dbl));
-      DBUG_ASSERT(len == maxSize);
+      assert(len == maxSize);
       dst.appendBytes(&m_value.dbl, len);
       break;
 
@@ -1710,8 +1717,8 @@ NdbQueryParamValue::serializeValue(const class NdbColumnImpl& column,
       {
         len  = 1+*((Uint8*)(m_value.raw));
 
-        DBUG_ASSERT(column.getType() == NdbDictionary::Column::Varchar ||
-                    column.getType() == NdbDictionary::Column::Varbinary);
+        assert(column.getType() == NdbDictionary::Column::Varchar ||
+               column.getType() == NdbDictionary::Column::Varbinary);
         if (unlikely(len > 1+static_cast<Uint32>(column.getLength())))
           return QRY_CHAR_PARAMETER_TRUNCATED;
 
@@ -1721,15 +1728,15 @@ NdbQueryParamValue::serializeValue(const class NdbColumnImpl& column,
       {
         len  = 2+uint2korr((Uint8*)m_value.raw);
 
-        DBUG_ASSERT(column.getType() == NdbDictionary::Column::Longvarchar ||
-                    column.getType() == NdbDictionary::Column::Longvarbinary);
+        assert(column.getType() == NdbDictionary::Column::Longvarchar ||
+               column.getType() == NdbDictionary::Column::Longvarbinary);
         if (unlikely(len > 2+static_cast<Uint32>(column.getLength())))
           return QRY_CHAR_PARAMETER_TRUNCATED;
         dst.appendBytes(m_value.raw, len);
       }
       else
       {
-        DBUG_ASSERT(0);
+        assert(0);
       }
       break;
 
@@ -1738,8 +1745,8 @@ NdbQueryParamValue::serializeValue(const class NdbColumnImpl& column,
       if (unlikely(column.m_arrayType != NDB_ARRAYTYPE_SHORT_VAR))
         return QRY_PARAMETER_HAS_WRONG_TYPE;
 
-      DBUG_ASSERT(column.getType() == NdbDictionary::Column::Varchar ||
-                  column.getType() == NdbDictionary::Column::Varbinary);
+      assert(column.getType() == NdbDictionary::Column::Varchar ||
+             column.getType() == NdbDictionary::Column::Varbinary);
 
       {
         // Convert from two-byte to one-byte length field.
