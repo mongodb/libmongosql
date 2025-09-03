@@ -51,10 +51,16 @@ CONFIGURE="CPPFLAGS=-fPIC $ICU_SRC_DIR/runConfigureICU $ICU_PLATFORM --enable-st
 set +o errexit
 case $VARIANT in
 windows-64)
-    # The cmd business brings all the needed compiler binaries into the shell's environment variables.
-    cmd /c "C:\Program^ Files^ ^(x86^)\Microsoft^ Visual^ Studio^ 14.0\VC\vcvarsall.bat amd64 && bash -c 'cd $ICU_BUILD_DIR ^&^& eval $CONFIGURE'"
+    VCVARSALL_PATH=$(vswhere.exe -latest -prerelease -products Microsoft.VisualStudio.Product.Professional -property installationPath |  tr -d '\r')\\VC\\Auxiliary\\Build\\vcvarsall.bat
+    if [ ! -f "$VCVARSALL_PATH" ]; then
+        echo "Error: The required file '$vcvarsall.bat' was not found." >&2
+        exit 1
+    fi
+
+    echo "Running $VCVARSALL_PATH amd64 && bash -c 'cd $ICU_BUILD_DIR ^&^& eval $CONFIGURE'"
+    cmd /c "$VCVARSALL_PATH amd64 && bash -c 'cd $ICU_BUILD_DIR ^&^& eval $CONFIGURE'"
     fail_on_error $? configure
-    cmd /c "C:\Program^ Files^ ^(x86^)\Microsoft^ Visual^ Studio^ 14.0\VC\vcvarsall.bat amd64 && bash -c 'cd $ICU_BUILD_DIR ^&^& make'"
+    cmd /c "$VCVARSALL_PATH amd64 && bash -c 'cd $ICU_BUILD_DIR ^&^& make'"
     fail_on_error $? make
     ;;
 windows-32)
@@ -71,4 +77,7 @@ windows-32)
     fail_on_error $? make
     ;;
 esac
+
+echo "Done building ICU"
+
 set -o errexit

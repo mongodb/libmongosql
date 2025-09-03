@@ -39,8 +39,8 @@
 #     We look for "C:/Program Files/OpenSSL-Win64/"
 # or
 #     https://brew.sh
-#     https://formulae.brew.sh/formula/openssl@1.1
-#     We look for "${HOMEBREW_HOME}/openssl@1.1"
+#     https://formulae.brew.sh/formula/openssl
+#     We look for "${HOMEBREW_HOME}/openssl"
 #     We look for the static libraries, rather than the .dylib ones.
 # When the package has been located, we treat it as if cmake had been
 # invoked with  -DWITH_SSL=</path/to/custom/openssl>
@@ -158,11 +158,15 @@ MACRO (MYSQL_CHECK_SSL)
   ENDIF()
 
   # See if WITH_SSL is of the form </path/to/custom/installation>
+  MESSAGE(STATUS "WITH_SSL is ${WITH_SSL}")
   FILE(GLOB WITH_SSL_HEADER ${WITH_SSL}/include/openssl/ssl.h)
   IF (WITH_SSL_HEADER)
+    MESSAGE(STATUS "WITH_SSL_HEADER is true")
     FILE(TO_CMAKE_PATH "${WITH_SSL}" WITH_SSL)
     SET(WITH_SSL_PATH ${WITH_SSL} CACHE PATH "path to custom SSL installation")
     SET(WITH_SSL_PATH ${WITH_SSL})
+  ELSE()
+    MESSAGE(STATUS "WITH_SSL_HEADER is False!!!!!")
   ENDIF()
 
   IF(WITH_SSL STREQUAL "system" OR
@@ -174,7 +178,7 @@ MACRO (MYSQL_CHECK_SSL)
     # have buggy implementations.
     IF((APPLE OR WIN32) AND NOT WITH_SSL_PATH AND WITH_SSL STREQUAL "system")
       IF(APPLE)
-        SET(WITH_SSL_PATH "${HOMEBREW_HOME}/openssl@1.1")
+        SET(WITH_SSL_PATH "${HOMEBREW_HOME}/openssl")
       ELSE()
         SET(WITH_SSL_PATH "C:/Program Files/OpenSSL-Win64/")
       ENDIF()
@@ -194,10 +198,10 @@ MACRO (MYSQL_CHECK_SSL)
             SET(OPENSSL_ROOT_DIR ${OPENSSL_WIN64})
             FIND_LIBRARY(OPENSSL_LIBRARY
               NAMES libssl_static
-              HINTS ${OPENSSL_ROOT_DIR}/lib)
+              HINTS ${OPENSSL_ROOT_DIR}/lib/VC/x64/MT)
             FIND_LIBRARY(CRYPTO_LIBRARY
               NAMES libcrypto_static
-              HINTS ${OPENSSL_ROOT_DIR}/lib)
+              HINTS ${OPENSSL_ROOT_DIR}/lib/VC/x64/MT)
             IF(OPENSSL_LIBRARY AND CRYPTO_LIBRARY)
               SET(FOUND_STATIC_SSL_LIBS 1)
             ENDIF()
@@ -213,6 +217,8 @@ MACRO (MYSQL_CHECK_SSL)
       NO_CMAKE_ENVIRONMENT_PATH
       HINTS ${WITH_SSL_PATH}
     )
+    MESSAGE(STATUS "OPENSSL_ROOT_DIR = ${OPENSSL_ROOT_DIR}")
+
     # Then search in standard places (if not found above).
     FIND_PATH(OPENSSL_ROOT_DIR
       NAMES include/openssl/ssl.h
@@ -222,6 +228,8 @@ MACRO (MYSQL_CHECK_SSL)
       NAMES openssl/ssl.h
       HINTS ${OPENSSL_ROOT_DIR}/include
     )
+
+    MESSAGE(STATUS "OPENSSL_INCLUDE_DIR = ${OPENSSL_INCLUDE_DIR}")
 
     IF (WIN32)
       FIND_FILE(OPENSSL_APPLINK_C
@@ -242,9 +250,13 @@ MACRO (MYSQL_CHECK_SSL)
     FIND_LIBRARY(OPENSSL_LIBRARY
                  NAMES ssl libssl ssleay32 ssleay32MD
                  HINTS ${OPENSSL_ROOT_DIR}/lib)
+    MESSAGE(STATUS "OPENSSL_LIBRARY = ${OPENSSL_LIBRARY}")
+
     FIND_LIBRARY(CRYPTO_LIBRARY
                  NAMES crypto libcrypto libeay32
                  HINTS ${OPENSSL_ROOT_DIR}/lib)
+    MESSAGE(STATUS "CRYPTO_LIBRARY = ${CRYPTO_LIBRARY}")
+
     IF (WITH_SSL_PATH)
       LIST(REVERSE CMAKE_FIND_LIBRARY_SUFFIXES)
     ENDIF()
@@ -252,6 +264,10 @@ MACRO (MYSQL_CHECK_SSL)
     IF(OPENSSL_INCLUDE_DIR)
       FIND_OPENSSL_VERSION()
     ENDIF()
+
+    MESSAGE(STATUS "OPENSSL_MAJOR_VERSION = ${OPENSSL_MAJOR_VERSION}")
+    MESSAGE(STATUS "OPENSSL_MINOR_VERSION = ${OPENSSL_MINOR_VERSION}")
+    MESSAGE(STATUS "OPENSSL_FIX_VERSION = ${OPENSSL_FIX_VERSION}")
 
     IF("${OPENSSL_VERSION}" VERSION_GREATER "1.1.0")
        ADD_DEFINITIONS(-DHAVE_TLSv13)
