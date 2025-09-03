@@ -1,5 +1,5 @@
 # Copyright (c) 2006, 2023, Oracle and/or its affiliates.
-# 
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License, version 2.0,
 # as published by the Free Software Foundation.
@@ -70,7 +70,7 @@ FIND_PACKAGE(Git)
 SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 
 # First, decide about build type (debug or release)
-# If cmake is invoked with -DCMAKE_BUILD_TYPE, 
+# If cmake is invoked with -DCMAKE_BUILD_TYPE,
 # respect user wishes and do not (re)define CMAKE_BUILD_TYPE. If WITH_DEBUG
 # is given, set CMAKE_BUILD_TYPE = Debug. Otherwise, use Relwithdebinfo.
 
@@ -84,12 +84,12 @@ OPTION(WITH_DEBUG "Use dbug/safemutex" OFF)
 # default being a community build. This does not impact the feature
 # set that will be compiled in; it's merely provided as a hint to
 # custom packaging steps.
-OPTION(COMMUNITY_BUILD "Set to true if this is a community build" ON) 
+OPTION(COMMUNITY_BUILD "Set to true if this is a community build" ON)
 
 # Use a default manufacturer if no manufacturer was identified.
 SET(MANUFACTURER_DOCSTRING
   "Set the entity that appears as the manufacturer of packages that support a manufacturer field.")
-IF(NOT DEFINED MANUFACTURER) 
+IF(NOT DEFINED MANUFACTURER)
   SET(MANUFACTURER "Built from Source" CACHE  STRING ${MANUFACTURER_DOCSTRING})
   MARK_AS_ADVANCED(MANUFACTURER)
 ENDIF()
@@ -106,9 +106,9 @@ ENDIF()
 MESSAGE(STATUS "Configuring with MAX_INDEXES = ${MAX_INDEXES}")
 
 # We choose to provide WITH_DEBUG as alias to standard CMAKE_BUILD_TYPE=Debug
-# which turns out to be not trivial, as this involves synchronization 
+# which turns out to be not trivial, as this involves synchronization
 # between CMAKE_BUILD_TYPE and WITH_DEBUG. Besides, we have to deal with cases
-# where WITH_DEBUG is  reset from ON to OFF  and here we need to reset 
+# where WITH_DEBUG is  reset from ON to OFF  and here we need to reset
 # CMAKE_BUILD_TYPE to either none or default RelWithDebInfo
 
 SET(BUILDTYPE_DOCSTRING
@@ -118,14 +118,14 @@ SET(BUILDTYPE_DOCSTRING
 IF(WITH_DEBUG)
   SET(CMAKE_BUILD_TYPE "Debug" CACHE STRING ${BUILDTYPE_DOCSTRING} FORCE)
   IF(UNIX AND NOT APPLE)
-    # Compiling with PIC speeds up embedded build, on PIC sensitive systems 
-    # Predefine it to ON, in case user chooses to build embedded. 
+    # Compiling with PIC speeds up embedded build, on PIC sensitive systems
+    # Predefine it to ON, in case user chooses to build embedded.
     SET(WITH_PIC ON CACHE BOOL "Compile with PIC")
   ENDIF()
   SET(OLD_WITH_DEBUG 1 CACHE INTERNAL "" FORCE)
 ELSEIF(NOT HAVE_CMAKE_BUILD_TYPE OR OLD_WITH_DEBUG)
   IF(CMAKE_BUILD_TYPE MATCHES "Debug" OR NOT HAVE_CMAKE_BUILD_TYPE)
-    SET(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING 
+    SET(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING
        ${BUILDTYPE_DOCSTRING} FORCE)
   ENDIF()
   SET(OLD_WITH_DEBUG 0 CACHE INTERNAL "" FORCE)
@@ -228,7 +228,7 @@ IF(UNIX)
 ELSE()
   OPTION(WITH_INNODB_MEMCACHED "" OFF)
 ENDIF()
- 
+
 # Following autotools tradition, add preprocessor definitions
 # specified in environment variable CPPFLAGS
 IF(DEFINED ENV{CPPFLAGS})
@@ -281,7 +281,7 @@ ELSE()
   OPTION(WITH_RAPID
     "Build additonal code(plugins) that is located in rapid directory" OFF)
 ENDIF()
-OPTION(DISABLE_SHARED 
+OPTION(DISABLE_SHARED
  "Don't build shared libraries, compile code as position-dependent" OFF)
 IF(DISABLE_SHARED)
   SET(WITHOUT_DYNAMIC_PLUGINS 1)
@@ -504,7 +504,7 @@ SET(WITH_TEST_TRACE_PLUGIN 0)
 ENDIF()
 
 IF(WITH_TEST_TRACE_PLUGIN AND NOT CMAKE_BUILD_TYPE MATCHES "Debug")
-  MESSAGE(SEND_ERROR 
+  MESSAGE(SEND_ERROR
           "Test trace plugin was selected but it can be included only in debug binaries.
           Set WITH_TEST_TRACE_PLUGIN to OFF or WITH_DEBUG to ON.")
 ENDIF()
@@ -695,19 +695,6 @@ IF(WITH_UNIT_TESTS)
  ENABLE_TESTING()
 ENDIF()
 
-# Placing this before the ADD_SUBDIRECTORYs undoes
-# commit 9f740e80f96aac4621c489888db355e4a4b4621c
-# This is neccesary to correctly build the mongosql-auth-c plugin.
-IF(NOT WITHOUT_SERVER)
-  SET (MYSQLD_STATIC_PLUGIN_LIBS "" CACHE INTERNAL "")
-  SET (MYSQLD_STATIC_EMBEDDED_PLUGIN_LIBS "" CACHE INTERNAL "")
-  # Add storage engines and plugins.
-  CONFIGURE_PLUGINS()
-ELSE()
-  # We may still want Cluster client libraries, use -DWITH_NDBCLUSTER=1
-  ADD_SUBDIRECTORY(storage/ndb)
-ENDIF()
-
 ADD_SUBDIRECTORY(include)
 ADD_SUBDIRECTORY(dbug)
 ADD_SUBDIRECTORY(strings)
@@ -733,7 +720,6 @@ ELSE()
   # We may still want Cluster client libraries, use -DWITH_NDBCLUSTER=1
   ADD_SUBDIRECTORY(storage/ndb)
 ENDIF()
-
 
 IF(WITH_UNIT_TESTS)
   # Visual Studio 11 needs this extra flag in order to compile gmock.
@@ -767,7 +753,7 @@ IF(NOT WITHOUT_SERVER)
   ADD_SUBDIRECTORY(testclients)
   ADD_SUBDIRECTORY(sql)
   OPTION (WITH_EMBEDDED_SERVER "Compile MySQL with embedded server" OFF)
-  IF(WITH_EMBEDDED_SERVER) 
+  IF(WITH_EMBEDDED_SERVER)
    ADD_SUBDIRECTORY(libmysqld)
    ADD_SUBDIRECTORY(libmysqld/examples)
   ENDIF(WITH_EMBEDDED_SERVER)
@@ -828,7 +814,7 @@ IF(WIN32)
   SET(CPACK_GENERATOR "ZIP")
 ELSE()
   SET(CPACK_GENERATOR "TGZ")
-ENDIF() 
+ENDIF()
 ADD_SUBDIRECTORY(packaging/WiX)
 ADD_SUBDIRECTORY(packaging/solaris)
 
@@ -896,37 +882,9 @@ MESSAGE(STATUS "COMPILE_DEFINITIONS: ${cwd_definitions}")
 REPORT_CXX_FLAGS()
 MESSAGE(STATUS "CMAKE_C_LINK_FLAGS: ${CMAKE_C_LINK_FLAGS}")
 MESSAGE(STATUS "CMAKE_CXX_LINK_FLAGS: ${CMAKE_CXX_LINK_FLAGS}")
-<<<<<<< HEAD
-IF(CMAKE_BUILD_TYPE AND BUILD_IS_SINGLE_CONFIG)
-  STRING(TOUPPER "${CMAKE_BUILD_TYPE}" CMAKEBT)
-  MESSAGE(STATUS "CMAKE_C_FLAGS_${CMAKEBT}: ${CMAKE_C_FLAGS_${CMAKEBT}}")
-  MESSAGE(STATUS "CMAKE_CXX_FLAGS_${CMAKEBT}: ${CMAKE_CXX_FLAGS_${CMAKEBT}}")
-ENDIF()
-IF(NOT BUILD_IS_SINGLE_CONFIG)
-  MESSAGE(STATUS "CMAKE_C_FLAGS_DEBUG: ${CMAKE_C_FLAGS_DEBUG}")
-  MESSAGE(STATUS "CMAKE_CXX_FLAGS_DEBUG: ${CMAKE_CXX_FLAGS_DEBUG}")
-  MESSAGE(STATUS
-    "CMAKE_C_FLAGS_RELWITHDEBINFO: ${CMAKE_C_FLAGS_RELWITHDEBINFO}")
-  MESSAGE(STATUS
-    "CMAKE_CXX_FLAGS_RELWITHDEBINFO: ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
-ENDIF()
-
 MESSAGE(STATUS "CMAKE_EXE_LINKER_FLAGS ${CMAKE_EXE_LINKER_FLAGS}")
 MESSAGE(STATUS "CMAKE_MODULE_LINKER_FLAGS ${CMAKE_MODULE_LINKER_FLAGS}")
 MESSAGE(STATUS "CMAKE_SHARED_LINKER_FLAGS ${CMAKE_SHARED_LINKER_FLAGS}")
-IF(CMAKE_BUILD_TYPE AND BUILD_IS_SINGLE_CONFIG)
-  STRING(TOUPPER "${CMAKE_BUILD_TYPE}" CMAKEBT)
-  MESSAGE(STATUS "CMAKE_C_FLAGS_${CMAKEBT}: ${CMAKE_C_FLAGS_${CMAKEBT}}")
-  MESSAGE(STATUS "CMAKE_CXX_FLAGS_${CMAKEBT}: ${CMAKE_CXX_FLAGS_${CMAKEBT}}")
-ENDIF()
-IF(NOT BUILD_IS_SINGLE_CONFIG)
-  MESSAGE(STATUS "CMAKE_C_FLAGS_DEBUG: ${CMAKE_C_FLAGS_DEBUG}")
-  MESSAGE(STATUS "CMAKE_CXX_FLAGS_DEBUG: ${CMAKE_CXX_FLAGS_DEBUG}")
-  MESSAGE(STATUS
-    "CMAKE_C_FLAGS_RELWITHDEBINFO: ${CMAKE_C_FLAGS_RELWITHDEBINFO}")
-  MESSAGE(STATUS
-    "CMAKE_CXX_FLAGS_RELWITHDEBINFO: ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
-ENDIF()
 
 add_executable(wildcard_hostname_validation_unit_tests
     ${CMAKE_SOURCE_DIR}/sql-common/hostname_validation_test.c
