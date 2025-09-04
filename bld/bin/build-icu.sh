@@ -57,6 +57,7 @@ windows-64)
         exit 1
     fi
     ESCAPED_VCVARSALL_PATH=$(echo "$VCVARSALL_PATH" | sed 's/ /\^ /g; s/(/\^(/g; s/)/\^)/g')
+    echo "ESCAPED_VCVARSALL_PATH : $ESCAPED_VCVARSALL_PATH"
 
     echo "Running  cmd /c \"$ESCAPED_VCVARSALL_PATH amd64 && bash -c 'cd $ICU_BUILD_DIR ^&^& eval $CONFIGURE'\""
     # Load Visual Studio environment
@@ -64,7 +65,7 @@ windows-64)
     fail_on_error $? configure
 
     # Build ICU using make
-    echo "Running  cmd /c \"$VCVARSALL_PATH" amd64 && bash -c cd "$ICU_BUILD_DIR" && make'\""
+    echo "Running  cmd /c \"$ESCAPED_VCVARSALL_PATH amd64 && bash -c 'cd $ICU_BUILD_DIR ^&^& make'\""
     cmd /c "$ESCAPED_VCVARSALL_PATH amd64 && bash -c 'cd $ICU_BUILD_DIR ^&^& make'"
     fail_on_error $? make
     ;;
