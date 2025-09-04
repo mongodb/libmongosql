@@ -35,6 +35,8 @@ platform="$(uname)"
 if [ "Linux" = "$platform" ]; then
 	# add system SSL (OpenSSL) to any Linux distro's cmake args.
     CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=system"
+elif [ "Darwin" = "$platform" ]; then
+    CMAKE_ARGS="$CMAKE_ARGS -DWITH_SSL=$OPENSSL_PATH"
 fi
 
 # set the build command
